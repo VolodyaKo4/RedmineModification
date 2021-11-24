@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,21 +18,19 @@
 class DocumentsController < ApplicationController
   default_search_scope :documents
   model_object Document
-  before_action :find_project_by_project_id, :only => [:index, :new, :create]
-  before_action :find_model_object, :except => [:index, :new, :create]
-  before_action :find_project_from_association, :except => [:index, :new, :create]
-  before_action :authorize
+  before_filter :find_project_by_project_id, :only => [:index, :new, :create]
+  before_filter :find_model_object, :except => [:index, :new, :create]
+  before_filter :find_project_from_association, :except => [:index, :new, :create]
+  before_filter :authorize
 
   helper :attachments
-  helper :custom_fields
 
   def index
     @sort_by = %w(category date title author).include?(params[:sort_by]) ? params[:sort_by] : 'category'
-    documents = @project.documents.includes(:attachments, :category).to_a
+    documents = @project.documents.includes(:attachments, :category).all
     case @sort_by
     when 'date'
-      documents.sort!{|a, b| b.updated_on <=> a.updated_on}
-      @grouped = documents.group_by {|d| d.updated_on.to_date}
+      @grouped = documents.group_by {|d| d.updated_on.to_date }
     when 'title'
       @grouped = documents.group_by {|d| d.title.first.upcase}
     when 'author'
@@ -47,7 +43,7 @@ class DocumentsController < ApplicationController
   end
 
   def show
-    @attachments = @document.attachments.to_a
+    @attachments = @document.attachments.all
   end
 
   def new
@@ -73,7 +69,7 @@ class DocumentsController < ApplicationController
 
   def update
     @document.safe_attributes = params[:document]
-    if @document.save
+    if request.put? and @document.save
       flash[:notice] = l(:notice_successful_update)
       redirect_to document_path(@document)
     else
@@ -83,7 +79,6 @@ class DocumentsController < ApplicationController
 
   def destroy
     @document.destroy if request.delete?
-    flash[:notice] = l(:notice_successful_delete)
     redirect_to project_documents_path(@project)
   end
 
@@ -92,7 +87,7 @@ class DocumentsController < ApplicationController
     render_attachment_warning_if_needed(@document)
 
     if attachments.present? && attachments[:files].present? && Setting.notified_events.include?('document_added')
-      Mailer.deliver_attachments_added(attachments[:files])
+      Mailer.attachments_added(attachments[:files]).deliver
     end
     redirect_to document_path(@document)
   end

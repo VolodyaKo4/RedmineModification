@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,22 +16,16 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class MailHandlerController < ActionController::Base
-  include ActiveSupport::SecurityUtils
-
-  before_action :check_credential
-
-  # Displays the email submission form
-  def new
-  end
+  before_filter :check_credential
 
   # Submits an incoming email to MailHandler
   def index
     options = params.dup
     email = options.delete(:email)
-    if MailHandler.safe_receive(email, options)
-      head :created
+    if MailHandler.receive(email, options)
+      render :nothing => true, :status => :created
     else
-      head :unprocessable_entity
+      render :nothing => true, :status => :unprocessable_entity
     end
   end
 
@@ -41,8 +33,8 @@ class MailHandlerController < ActionController::Base
 
   def check_credential
     User.current = nil
-    unless Setting.mail_handler_api_enabled? && secure_compare(params[:key].to_s, Setting.mail_handler_api_key.to_s)
-      render :plain => 'Access denied. Incoming emails WS is disabled or key is invalid.', :status => 403
+    unless Setting.mail_handler_api_enabled? && params[:key].to_s == Setting.mail_handler_api_key
+      render :text => 'Access denied. Incoming emails WS is disabled or key is invalid.', :status => 403
     end
   end
 end

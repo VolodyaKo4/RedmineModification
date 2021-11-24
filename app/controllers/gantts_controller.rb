@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,7 +17,7 @@
 
 class GanttsController < ApplicationController
   menu_item :gantt
-  before_action :find_optional_project
+  before_filter :find_optional_project
 
   rescue_from Query::StatementInvalid, :with => :query_statement_invalid
 
@@ -28,6 +26,8 @@ class GanttsController < ApplicationController
   helper :projects
   helper :queries
   include QueriesHelper
+  helper :sort
+  include SortHelper
   include Redmine::Export::PDF
 
   def show
@@ -40,19 +40,9 @@ class GanttsController < ApplicationController
     basename = (@project ? "#{@project.identifier}-" : '') + 'gantt'
 
     respond_to do |format|
-      format.html {render :action => "show", :layout => !request.xhr?}
-      if @gantt.respond_to?('to_image')
-        format.png do
-          send_data(@gantt.to_image,
-                    :disposition => 'inline', :type => 'image/png',
-                    :filename => "#{basename}.png")
-        end
-      end
-      format.pdf do
-        send_data(@gantt.to_pdf,
-                  :type => 'application/pdf',
-                  :filename => "#{basename}.pdf")
-      end
+      format.html { render :action => "show", :layout => !request.xhr? }
+      format.png  { send_data(@gantt.to_image, :disposition => 'inline', :type => 'image/png', :filename => "#{basename}.png") } if @gantt.respond_to?('to_image')
+      format.pdf  { send_data(@gantt.to_pdf, :type => 'application/pdf', :filename => "#{basename}.pdf") }
     end
   end
 end

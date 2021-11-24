@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,7 +17,7 @@
 
 class CalendarsController < ApplicationController
   menu_item :calendar
-  before_action :find_optional_project
+  before_filter :find_optional_project
 
   rescue_from Query::StatementInvalid, :with => :query_statement_invalid
 
@@ -27,6 +25,8 @@ class CalendarsController < ApplicationController
   helper :projects
   helper :queries
   include QueriesHelper
+  helper :sort
+  include SortHelper
 
   def show
     if params[:year] and params[:year].to_i > 1900
@@ -35,31 +35,19 @@ class CalendarsController < ApplicationController
         @month = params[:month].to_i
       end
     end
-    @year ||= User.current.today.year
-    @month ||= User.current.today.month
+    @year ||= Date.today.year
+    @month ||= Date.today.month
 
     @calendar = Redmine::Helpers::Calendar.new(Date.civil(@year, @month, 1), current_language, :month)
     retrieve_query
     @query.group_by = nil
-    @query.sort_criteria = nil
     if @query.valid?
       events = []
-      events +=
-        @query.issues(
-          :include => [:tracker, :assigned_to, :priority],
-          :conditions => [
-            "((start_date BETWEEN ? AND ?) OR (due_date BETWEEN ? AND ?))",
-            @calendar.startdt, @calendar.enddt,
-            @calendar.startdt, @calendar.enddt
-          ]
-        )
-      events +=
-        @query.versions(
-          :conditions => [
-            "effective_date BETWEEN ? AND ?",
-            @calendar.startdt, @calendar.enddt
-          ]
-        )
+      events += @query.issues(:include => [:tracker, :assigned_to, :priority],
+                              :conditions => ["((start_date BETWEEN ? AND ?) OR (due_date BETWEEN ? AND ?))", @calendar.startdt, @calendar.enddt, @calendar.startdt, @calendar.enddt]
+                              )
+      events += @query.versions(:conditions => ["effective_date BETWEEN ? AND ?", @calendar.startdt, @calendar.enddt])
+
       @calendar.events = events
     end
 

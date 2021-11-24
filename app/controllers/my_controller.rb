@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,22 +16,26 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class MyController < ApplicationController
-  self.main_menu = false
-  before_action :require_login
+  before_filter :require_login
   # let user change user's password when user has to
-  skip_before_action :check_password_change, :check_twofa_activation, :only => :password
-
-  accept_api_auth :account
-
-  require_sudo_mode :account, only: :put
-  require_sudo_mode :reset_rss_key, :reset_api_key, :show_api_key, :destroy
+  skip_before_filter :check_password_change, :only => :password
 
   helper :issues
   helper :users
   helper :custom_fields
-  helper :queries
-  helper :activities
-  helper :calendars
+
+  BLOCKS = { 'issuesassignedtome' => :label_assigned_to_me_issues,
+             'issuesreportedbyme' => :label_reported_issues,
+             'issueswatched' => :label_watched_issues,
+             'news' => :label_news_latest,
+             'calendar' => :label_calendar,
+             'documents' => :label_document_plural,
+             'timelog' => :label_spent_time
+           }.merge(Redmine::Views::MyPage::Block.additional_blocks).freeze
+
+  DEFAULT_LAYOUT = {  'left' => ['issuesassignedtome'],
+                      'right' => ['issuesreportedbyme']
+                   }.freeze
 
   def index
     page
@@ -43,33 +45,22 @@ class MyController < ApplicationController
   # Show user's page
   def page
     @user = User.current
-    @groups = @user.pref.my_page_groups
-    @blocks = @user.pref.my_page_layout
+    @blocks = @user.pref[:my_page_layout] || DEFAULT_LAYOUT
   end
 
   # Edit user's account
   def account
     @user = User.current
     @pref = @user.pref
-    if request.put?
+    if request.post?
       @user.safe_attributes = params[:user]
-      @user.pref.safe_attributes = params[:pref]
+      @user.pref.attributes = params[:pref]
       if @user.save
         @user.pref.save
         set_language_if_valid @user.language
-        respond_to do |format|
-          format.html do
-            flash[:notice] = l(:notice_account_updated)
-            redirect_to my_account_path
-          end
-          format.api  {render_api_ok}
-        end
+        flash[:notice] = l(:notice_account_updated)
+        redirect_to my_account_path
         return
-      else
-        respond_to do |format|
-          format.html {render :action => :account}
-          format.api  {render_validation_errors(@user)}
-        end
       end
     end
   end
@@ -109,9 +100,6 @@ class MyController < ApplicationController
         @user.password, @user.password_confirmation = params[:new_password], params[:new_password_confirmation]
         @user.must_change_passwd = false
         if @user.save
-          # The session token was destroyed by the password change, generate a new one
-          session[:tk] = @user.generate_session_token
-          Mailer.deliver_password_updated(@user, User.current)
           flash[:notice] = l(:notice_account_password_updated)
           redirect_to my_account_path
         end
@@ -132,10 +120,6 @@ class MyController < ApplicationController
     redirect_to my_account_path
   end
 
-  def show_api_key
-    @user = User.current
-  end
-
   # Create a new API key
   def reset_api_key
     if request.post?
@@ -149,54 +133,69 @@ class MyController < ApplicationController
     redirect_to my_account_path
   end
 
-  def update_page
+  # User's page layout configuration
+  def page_layout
     @user = User.current
-    block_settings = params[:settings] || {}
-
-    block_settings.each do |block, settings|
-      @user.pref.update_block_settings(block, settings.to_unsafe_hash)
+    @blocks = @user.pref[:my_page_layout] || DEFAULT_LAYOUT.dup
+    @block_options = []
+    BLOCKS.each do |k, v|
+      unless @blocks.values.flatten.include?(k)
+        @block_options << [l("my.blocks.#{v}", :default => [v, v.to_s.humanize]), k.dasherize]
+      end
     end
-    @user.pref.save
-    @updated_blocks = block_settings.keys
   end
 
   # Add a block to user's page
   # The block is added on top of the page
   # params[:block] : id of the block to add
   def add_block
-    @user = User.current
-    @block = params[:block]
-    if @user.pref.add_block @block
+    block = params[:block].to_s.underscore
+    if block.present? && BLOCKS.key?(block)
+      @user = User.current
+      layout = @user.pref[:my_page_layout] || {}
+      # remove if already present in a group
+      %w(top left right).each {|f| (layout[f] ||= []).delete block }
+      # add it on top
+      layout['top'].unshift block
+      @user.pref[:my_page_layout] = layout
       @user.pref.save
-      respond_to do |format|
-        format.html {redirect_to my_page_path}
-        format.js
-      end
-    else
-      render_error :status => 422
     end
+    redirect_to my_page_layout_path
   end
 
   # Remove a block to user's page
   # params[:block] : id of the block to remove
   def remove_block
+    block = params[:block].to_s.underscore
     @user = User.current
-    @block = params[:block]
-    @user.pref.remove_block @block
+    # remove block in all groups
+    layout = @user.pref[:my_page_layout] || {}
+    %w(top left right).each {|f| (layout[f] ||= []).delete block }
+    @user.pref[:my_page_layout] = layout
     @user.pref.save
-    respond_to do |format|
-      format.html {redirect_to my_page_path}
-      format.js
-    end
+    redirect_to my_page_layout_path
   end
 
   # Change blocks order on user's page
   # params[:group] : group to order (top, left or right)
-  # params[:blocks] : array of block ids of the group
+  # params[:list-(top|left|right)] : array of block ids of the group
   def order_blocks
+    group = params[:group]
     @user = User.current
-    @user.pref.order_blocks params[:group], params[:blocks]
-    @user.pref.save
-    head 200
+    if group.is_a?(String)
+      group_items = (params["blocks"] || []).collect(&:underscore)
+      group_items.each {|s| s.sub!(/^block_/, '')}
+      if group_items and group_items.is_a? Array
+        layout = @user.pref[:my_page_layout] || {}
+        # remove group blocks if they are presents in other groups
+        %w(top left right).each {|f|
+          layout[f] = (layout[f] || []) - group_items
+        }
+        layout[group] = group_items
+        @user.pref[:my_page_layout] = layout
+        @user.pref.save
+      end
+    end
+    render :nothing => true
   end
 end

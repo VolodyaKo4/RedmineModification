@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,10 +18,10 @@
 class MessagesController < ApplicationController
   menu_item :boards
   default_search_scope :messages
-  before_action :find_board, :only => [:new, :preview]
-  before_action :find_attachments, :only => [:preview]
-  before_action :find_message, :except => [:new, :preview]
-  before_action :authorize, :except => [:preview, :edit, :destroy]
+  before_filter :find_board, :only => [:new, :preview]
+  before_filter :find_attachments, :only => [:preview]
+  before_filter :find_message, :except => [:new, :preview]
+  before_filter :authorize, :except => [:preview, :edit, :destroy]
 
   helper :boards
   helper :watchers
@@ -45,10 +43,10 @@ class MessagesController < ApplicationController
     @reply_pages = Paginator.new @reply_count, REPLIES_PER_PAGE, page
     @replies =  @topic.children.
       includes(:author, :attachments, {:board => :project}).
-      reorder("#{Message.table_name}.created_on ASC, #{Message.table_name}.id ASC").
+      reorder("#{Message.table_name}.created_on ASC").
       limit(@reply_pages.per_page).
       offset(@reply_pages.offset).
-      to_a
+      all
 
     @reply = Message.new(:subject => "RE: #{@message.subject}")
     render :action => "show", :layout => false if request.xhr?
@@ -63,9 +61,8 @@ class MessagesController < ApplicationController
     if request.post?
       @message.save_attachments(params[:attachments])
       if @message.save
-        call_hook(:controller_messages_new_after_save, {:params => params, :message => @message})
+        call_hook(:controller_messages_new_after_save, { :params => params, :message => @message})
         render_attachment_warning_if_needed(@message)
-        flash[:notice] = l(:notice_successful_create)
         redirect_to board_message_path(@board, @message)
       end
     end
@@ -77,13 +74,12 @@ class MessagesController < ApplicationController
     @reply.author = User.current
     @reply.board = @board
     @reply.safe_attributes = params[:reply]
-    @reply.save_attachments(params[:attachments])
     @topic.children << @reply
     if !@reply.new_record?
-      call_hook(:controller_messages_reply_after_save, {:params => params, :message => @reply})
+      call_hook(:controller_messages_reply_after_save, { :params => params, :message => @reply})
+      attachments = Attachment.attach_files(@reply, params[:attachments])
       render_attachment_warning_if_needed(@reply)
     end
-    flash[:notice] = l(:notice_successful_update)
     redirect_to board_message_path(@board, @topic, :r => @reply)
   end
 
@@ -91,14 +87,12 @@ class MessagesController < ApplicationController
   def edit
     (render_403; return false) unless @message.editable_by?(User.current)
     @message.safe_attributes = params[:message]
-    if request.post?
-      @message.save_attachments(params[:attachments])
-      if @message.save
-        render_attachment_warning_if_needed(@message)
-        flash[:notice] = l(:notice_successful_update)
-        @message.reload
-        redirect_to board_message_path(@message.board, @message.root, :r => (@message.parent_id && @message.id))
-      end
+    if request.post? && @message.save
+      attachments = Attachment.attach_files(@message, params[:attachments])
+      render_attachment_warning_if_needed(@message)
+      flash[:notice] = l(:notice_successful_update)
+      @message.reload
+      redirect_to board_message_path(@message.board, @message.root, :r => (@message.parent_id && @message.id))
     end
   end
 
@@ -107,7 +101,6 @@ class MessagesController < ApplicationController
     (render_403; return false) unless @message.destroyable_by?(User.current)
     r = @message.to_param
     @message.destroy
-    flash[:notice] = l(:notice_successful_delete)
     if @message.parent
       redirect_to board_message_path(@board, @message.parent, :r => r)
     else
@@ -119,26 +112,20 @@ class MessagesController < ApplicationController
     @subject = @message.subject
     @subject = "RE: #{@subject}" unless @subject.starts_with?('RE:')
 
-    if @message.root == @message
-      @content = +"#{ll(Setting.default_language, :text_user_wrote, @message.author)}\n> "
-    else
-      @content = +"#{ll(Setting.default_language, :text_user_wrote_in, {:value => @message.author, :link => "message##{@message.id}"})}\n> "
-    end
+    @content = "#{ll(Setting.default_language, :text_user_wrote, @message.author)}\n> "
     @content << @message.content.to_s.strip.gsub(%r{<pre>(.*?)</pre>}m, '[...]').gsub(/(\r?\n|\r\n?)/, "\n> ") + "\n\n"
   end
 
   def preview
     message = @board.messages.find_by_id(params[:id])
-    @text = params[:text] ? params[:text] : nil
+    @text = (params[:message] || params[:reply])[:content]
     @previewed = message
     render :partial => 'common/preview'
   end
 
-  private
-
+private
   def find_message
     return unless find_board
-
     @message = @board.messages.includes(:parent).find(params[:id])
     @topic = @message.root
   rescue ActiveRecord::RecordNotFound

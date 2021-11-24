@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,7 +17,7 @@
 
 class BoardsController < ApplicationController
   default_search_scope :messages
-  before_action :find_project_by_project_id, :find_board_if_available, :authorize
+  before_filter :find_project_by_project_id, :find_board_if_available, :authorize
   accept_rss_auth :index, :show
 
   helper :sort
@@ -27,7 +25,7 @@ class BoardsController < ApplicationController
   helper :watchers
 
   def index
-    @boards = @project.boards.preload(:last_message => :author).to_a
+    @boards = @project.boards.includes(:project, :last_message => :author).all
     # show the board if there is only one
     if @boards.size == 1
       @board = @boards.first
@@ -37,32 +35,33 @@ class BoardsController < ApplicationController
 
   def show
     respond_to do |format|
-      format.html do
+      format.html {
         sort_init 'updated_on', 'desc'
-        sort_update 'created_on' => "#{Message.table_name}.id",
+        sort_update 'created_on' => "#{Message.table_name}.created_on",
                     'replies' => "#{Message.table_name}.replies_count",
-                    'updated_on' => "COALESCE(#{Message.table_name}.last_reply_id, #{Message.table_name}.id)"
+                    'updated_on' => "COALESCE(last_replies_messages.created_on, #{Message.table_name}.created_on)"
 
         @topic_count = @board.topics.count
         @topic_pages = Paginator.new @topic_count, per_page_option, params['page']
         @topics =  @board.topics.
-          reorder(:sticky => :desc).
+          reorder("#{Message.table_name}.sticky DESC").
+          includes(:last_reply).
           limit(@topic_pages.per_page).
           offset(@topic_pages.offset).
           order(sort_clause).
           preload(:author, {:last_reply => :author}).
-          to_a
+          all
         @message = Message.new(:board => @board)
         render :action => 'show', :layout => !request.xhr?
-      end
-      format.atom do
+      }
+      format.atom {
         @messages = @board.messages.
-          reorder(:id => :desc).
+          reorder('created_on DESC').
           includes(:author, :board).
           limit(Setting.feeds_limit.to_i).
-          to_a
+          all
         render_feed(@messages, :title => "#{@project}: #{@board}")
-      end
+      }
     end
   end
 
@@ -88,30 +87,18 @@ class BoardsController < ApplicationController
   def update
     @board.safe_attributes = params[:board]
     if @board.save
-      respond_to do |format|
-        format.html do
-          flash[:notice] = l(:notice_successful_update)
-          redirect_to_settings_in_projects
-        end
-        format.js {head 200}
-      end
+      redirect_to_settings_in_projects
     else
-      respond_to do |format|
-        format.html {render :action => 'edit'}
-        format.js {head 422}
-      end
+      render :action => 'edit'
     end
   end
 
   def destroy
-    if @board.destroy
-      flash[:notice] = l(:notice_successful_delete)
-    end
+    @board.destroy
     redirect_to_settings_in_projects
   end
 
-  private
-
+private
   def redirect_to_settings_in_projects
     redirect_to settings_project_path(@project, :tab => 'boards')
   end

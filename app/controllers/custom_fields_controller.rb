@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,23 +17,20 @@
 
 class CustomFieldsController < ApplicationController
   layout 'admin'
-  self.main_menu = false
 
-  before_action :require_admin
-  before_action :build_new_custom_field, :only => [:new, :create]
-  before_action :find_custom_field, :only => [:edit, :update, :destroy]
+  before_filter :require_admin
+  before_filter :build_new_custom_field, :only => [:new, :create]
+  before_filter :find_custom_field, :only => [:edit, :update, :destroy]
   accept_api_auth :index
 
   def index
     respond_to do |format|
-      format.html do
-        @custom_fields_by_type = CustomField.all.group_by {|f| f.class.name}
-        @custom_fields_projects_count =
-          IssueCustomField.where(is_for_all: false).joins(:projects).group(:custom_field_id).count
-      end
-      format.api do
+      format.html {
+        @custom_fields_by_type = CustomField.all.group_by {|f| f.class.name }
+      }
+      format.api {
         @custom_fields = CustomField.all
-      end
+      }
     end
   end
 
@@ -48,11 +43,7 @@ class CustomFieldsController < ApplicationController
     if @custom_field.save
       flash[:notice] = l(:notice_successful_create)
       call_hook(:controller_custom_fields_new_after_save, :params => params, :custom_field => @custom_field)
-      if params[:continue]
-        redirect_to new_custom_field_path({:type => @custom_field.type})
-      else
-        redirect_to custom_fields_path({:tab => @custom_field.type})
-      end
+      redirect_to custom_fields_path(:tab => @custom_field.class.name)
     else
       render :action => 'new'
     end
@@ -62,29 +53,18 @@ class CustomFieldsController < ApplicationController
   end
 
   def update
-    @custom_field.safe_attributes = params[:custom_field]
-    if @custom_field.save
+    if @custom_field.update_attributes(params[:custom_field])
+      flash[:notice] = l(:notice_successful_update)
       call_hook(:controller_custom_fields_edit_after_save, :params => params, :custom_field => @custom_field)
-      respond_to do |format|
-        format.html do
-          flash[:notice] = l(:notice_successful_update)
-          redirect_back_or_default edit_custom_field_path(@custom_field)
-        end
-        format.js {head 200}
-      end
+      redirect_to custom_fields_path(:tab => @custom_field.class.name)
     else
-      respond_to do |format|
-        format.html {render :action => 'edit'}
-        format.js {head 422}
-      end
+      render :action => 'edit'
     end
   end
 
   def destroy
     begin
-      if @custom_field.destroy
-        flash[:notice] = l(:notice_successful_delete)
-      end
+      @custom_field.destroy
     rescue
       flash[:error] = l(:error_can_not_delete_custom_field)
     end
@@ -94,14 +74,9 @@ class CustomFieldsController < ApplicationController
   private
 
   def build_new_custom_field
-    @custom_field = CustomField.new_subclass_instance(params[:type])
+    @custom_field = CustomField.new_subclass_instance(params[:type], params[:custom_field])
     if @custom_field.nil?
       render :action => 'select_type'
-    else
-      if params[:copy].present? && (@copy_from = CustomField.find_by(id: params[:copy]))
-        @custom_field.copy_from(@copy_from)
-      end
-      @custom_field.safe_attributes = params[:custom_field]
     end
   end
 

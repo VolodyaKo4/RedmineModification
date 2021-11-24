@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,22 +17,23 @@
 
 class AuthSourcesController < ApplicationController
   layout 'admin'
-  self.main_menu = false
   menu_item :ldap_authentication
 
-  before_action :require_admin
-  before_action :build_new_auth_source, :only => [:new, :create]
-  before_action :find_auth_source, :only => [:edit, :update, :test_connection, :destroy]
-  require_sudo_mode :update, :destroy
+  before_filter :require_admin
+  before_filter :find_auth_source, :only => [:edit, :update, :test_connection, :destroy]
 
   def index
     @auth_source_pages, @auth_sources = paginate AuthSource, :per_page => 25
   end
 
   def new
+    klass_name = params[:type] || 'AuthSourceLdap'
+    @auth_source = AuthSource.new_subclass_instance(klass_name, params[:auth_source])
+    render_404 unless @auth_source
   end
 
   def create
+    @auth_source = AuthSource.new_subclass_instance(params[:type], params[:auth_source])
     if @auth_source.save
       flash[:notice] = l(:notice_successful_create)
       redirect_to auth_sources_path
@@ -47,8 +46,7 @@ class AuthSourcesController < ApplicationController
   end
 
   def update
-    @auth_source.safe_attributes = params[:auth_source]
-    if @auth_source.save
+    if @auth_source.update_attributes(params[:auth_source])
       flash[:notice] = l(:notice_successful_update)
       redirect_to auth_sources_path
     else
@@ -60,7 +58,7 @@ class AuthSourcesController < ApplicationController
     begin
       @auth_source.test_connection
       flash[:notice] = l(:notice_successful_connection)
-    rescue => e
+    rescue Exception => e
       flash[:error] = l(:error_unable_to_connect, e.message)
     end
     redirect_to auth_sources_path
@@ -70,38 +68,25 @@ class AuthSourcesController < ApplicationController
     unless @auth_source.users.exists?
       @auth_source.destroy
       flash[:notice] = l(:notice_successful_delete)
-    else
-      flash[:error] = l(:error_can_not_delete_auth_source)
     end
     redirect_to auth_sources_path
   end
 
   def autocomplete_for_new_user
     results = AuthSource.search(params[:term])
-    json = results.map do |result|
-      {
-        'value' => result[:login],
-        'label' => "#{result[:login]} (#{result[:firstname]} #{result[:lastname]})",
-        'login' => result[:login].to_s,
-        'firstname' => result[:firstname].to_s,
-        'lastname' => result[:lastname].to_s,
-        'mail' => result[:mail].to_s,
-        'auth_source_id' => result[:auth_source_id].to_s
-      }
-    end
-    render :json => json
+
+    render :json => results.map {|result| {
+      'value' => result[:login],
+      'label' => "#{result[:login]} (#{result[:firstname]} #{result[:lastname]})",
+      'login' => result[:login].to_s,
+      'firstname' => result[:firstname].to_s,
+      'lastname' => result[:lastname].to_s,
+      'mail' => result[:mail].to_s,
+      'auth_source_id' => result[:auth_source_id].to_s
+    }}
   end
 
   private
-
-  def build_new_auth_source
-    @auth_source = AuthSource.new_subclass_instance(params[:type] || 'AuthSourceLdap')
-    if @auth_source
-      @auth_source.safe_attributes = params[:auth_source]
-    else
-      render_404
-    end
-  end
 
   def find_auth_source
     @auth_source = AuthSource.find(params[:id])

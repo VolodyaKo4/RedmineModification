@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,10 +18,10 @@
 class VersionsController < ApplicationController
   menu_item :roadmap
   model_object Version
-  before_action :find_model_object, :except => [:index, :new, :create, :close_completed]
-  before_action :find_project_from_association, :except => [:index, :new, :create, :close_completed]
-  before_action :find_project_by_project_id, :only => [:index, :new, :create, :close_completed]
-  before_action :authorize
+  before_filter :find_model_object, :except => [:index, :new, :create, :close_completed]
+  before_filter :find_project_from_association, :except => [:index, :new, :create, :close_completed]
+  before_filter :find_project_by_project_id, :only => [:index, :new, :create, :close_completed]
+  before_filter :authorize
 
   accept_api_auth :index, :show, :create, :update, :destroy
 
@@ -32,17 +30,17 @@ class VersionsController < ApplicationController
 
   def index
     respond_to do |format|
-      format.html do
-        @trackers = @project.trackers.sorted.to_a
+      format.html {
+        @trackers = @project.trackers.sorted.all
         retrieve_selected_tracker_ids(@trackers, @trackers.select {|t| t.is_in_roadmap?})
         @with_subprojects = params[:with_subprojects].nil? ? Setting.display_subprojects_issues? : (params[:with_subprojects] == '1')
-        project_ids = @with_subprojects ? @project.self_and_descendants.pluck(:id) : [@project.id]
+        project_ids = @with_subprojects ? @project.self_and_descendants.collect(&:id) : [@project.id]
 
-        @versions = @project.shared_versions.preload(:custom_values)
-        @versions += @project.rolled_up_versions.visible.preload(:custom_values) if @with_subprojects
-        @versions = @versions.to_a.uniq.sort
+        @versions = @project.shared_versions || []
+        @versions += @project.rolled_up_versions.visible if @with_subprojects
+        @versions = @versions.uniq.sort
         unless params[:completed]
-          @completed_versions = @versions.select(&:completed?).reverse
+          @completed_versions = @versions.select {|version| version.closed? || version.completed? }
           @versions -= @completed_versions
         end
 
@@ -56,22 +54,21 @@ class VersionsController < ApplicationController
           @issues_by_version = issues.group_by(&:fixed_version)
         end
         @versions.reject! {|version| !project_ids.include?(version.project_id) && @issues_by_version[version].blank?}
-      end
-      format.api do
-        @versions = @project.shared_versions.to_a
-      end
+      }
+      format.api {
+        @versions = @project.shared_versions.all
+      }
     end
   end
 
   def show
     respond_to do |format|
-      format.html do
+      format.html {
         @issues = @version.fixed_issues.visible.
           includes(:status, :tracker, :priority).
-          preload(:project).
           reorder("#{Tracker.table_name}.position, #{Issue.table_name}.id").
-          to_a
-      end
+          all
+      }
       format.api
     end
   end
@@ -108,9 +105,9 @@ class VersionsController < ApplicationController
         end
       else
         respond_to do |format|
-          format.html {render :action => 'new'}
-          format.js   {render :action => 'new'}
-          format.api  {render_validation_errors(@version)}
+          format.html { render :action => 'new' }
+          format.js   { render :action => 'new' }
+          format.api  { render_validation_errors(@version) }
         end
       end
     end
@@ -120,22 +117,22 @@ class VersionsController < ApplicationController
   end
 
   def update
-    if params[:version]
+    if request.put? && params[:version]
       attributes = params[:version].dup
       attributes.delete('sharing') unless @version.allowed_sharings.include?(attributes['sharing'])
       @version.safe_attributes = attributes
       if @version.save
         respond_to do |format|
-          format.html do
+          format.html {
             flash[:notice] = l(:notice_successful_update)
             redirect_back_or_default settings_project_path(@project, :tab => 'versions')
-          end
-          format.api  {render_api_ok}
+          }
+          format.api  { render_api_ok }
         end
       else
         respond_to do |format|
-          format.html {render :action => 'edit'}
-          format.api  {render_validation_errors(@version)}
+          format.html { render :action => 'edit' }
+          format.api  { render_validation_errors(@version) }
         end
       end
     end
@@ -149,26 +146,26 @@ class VersionsController < ApplicationController
   end
 
   def destroy
-    if @version.deletable?
+    if @version.fixed_issues.empty?
       @version.destroy
       respond_to do |format|
-        format.html {redirect_back_or_default settings_project_path(@project, :tab => 'versions')}
-        format.api  {render_api_ok}
+        format.html { redirect_back_or_default settings_project_path(@project, :tab => 'versions') }
+        format.api  { render_api_ok }
       end
     else
       respond_to do |format|
-        format.html do
+        format.html {
           flash[:error] = l(:notice_unable_delete_version)
           redirect_to settings_project_path(@project, :tab => 'versions')
-        end
-        format.api  {head :unprocessable_entity}
+        }
+        format.api  { head :unprocessable_entity }
       end
     end
   end
 
   def status_by
     respond_to do |format|
-      format.html {render :action => 'show'}
+      format.html { render :action => 'show' }
       format.js
     end
   end
@@ -177,15 +174,9 @@ class VersionsController < ApplicationController
 
   def retrieve_selected_tracker_ids(selectable_trackers, default_trackers=nil)
     if ids = params[:tracker_ids]
-      @selected_tracker_ids =
-        if ids.is_a? Array
-          ids.collect {|id| id.to_i.to_s}
-        else
-          ids.split('/').collect {|id| id.to_i.to_s}
-        end
+      @selected_tracker_ids = (ids.is_a? Array) ? ids.collect { |id| id.to_i.to_s } : ids.split('/').collect { |id| id.to_i.to_s }
     else
-      @selected_tracker_ids =
-        (default_trackers || selectable_trackers).collect {|t| t.id.to_s}
+      @selected_tracker_ids = (default_trackers || selectable_trackers).collect {|t| t.id.to_s }
     end
   end
 end

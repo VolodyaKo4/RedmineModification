@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,13 +18,13 @@
 class NewsController < ApplicationController
   default_search_scope :news
   model_object News
-  before_action :find_model_object, :except => [:new, :create, :index]
-  before_action :find_project_from_association, :except => [:new, :create, :index]
-  before_action :find_project_by_project_id, :only => :create
-  before_action :authorize, :except => [:index, :new]
-  before_action :find_optional_project, :only => [:index, :new]
+  before_filter :find_model_object, :except => [:new, :create, :index]
+  before_filter :find_project_from_association, :except => [:new, :create, :index]
+  before_filter :find_project_by_project_id, :only => [:new, :create]
+  before_filter :authorize, :except => [:index]
+  before_filter :find_optional_project, :only => :index
   accept_rss_auth :index
-  accept_api_auth :index, :show, :create, :update, :destroy
+  accept_api_auth :index
 
   helper :watchers
   helper :attachments
@@ -48,53 +46,36 @@ class NewsController < ApplicationController
                       order("#{News.table_name}.created_on DESC").
                       limit(@limit).
                       offset(@offset).
-                      to_a
+                      all
     respond_to do |format|
-      format.html do
+      format.html {
         @news = News.new # for adding news inline
         render :layout => false if request.xhr?
-      end
+      }
       format.api
-      format.atom do
-        render_feed(
-          @newss,
-          :title =>
-            (@project ? @project.name : Setting.app_title) +
-              ": #{l(:label_news_plural)}"
-        )
-      end
+      format.atom { render_feed(@newss, :title => (@project ? @project.name : Setting.app_title) + ": #{l(:label_news_plural)}") }
     end
   end
 
   def show
-    @comments = @news.comments.to_a
+    @comments = @news.comments
     @comments.reverse! if User.current.wants_comments_in_reverse_order?
   end
 
   def new
-    raise ::Unauthorized unless User.current.allowed_to?(:manage_news, @project, :global => true)
-
     @news = News.new(:project => @project, :author => User.current)
   end
 
   def create
     @news = News.new(:project => @project, :author => User.current)
     @news.safe_attributes = params[:news]
-    @news.save_attachments(params[:attachments] || (params[:news] && params[:news][:uploads]))
+    @news.save_attachments(params[:attachments])
     if @news.save
-      respond_to do |format|
-        format.html do
-          render_attachment_warning_if_needed(@news)
-          flash[:notice] = l(:notice_successful_create)
-          redirect_to params[:cross_project] ? news_index_path : project_news_index_path(@project)
-        end
-        format.api  {render_api_ok}
-      end
+      render_attachment_warning_if_needed(@news)
+      flash[:notice] = l(:notice_successful_create)
+      redirect_to project_news_index_path(@project)
     else
-      respond_to do |format|
-        format.html {render :action => 'new'}
-        format.api  {render_validation_errors(@news)}
-      end
+      render :action => 'new'
     end
   end
 
@@ -103,32 +84,28 @@ class NewsController < ApplicationController
 
   def update
     @news.safe_attributes = params[:news]
-    @news.save_attachments(params[:attachments] || (params[:news] && params[:news][:uploads]))
+    @news.save_attachments(params[:attachments])
     if @news.save
-      respond_to do |format|
-        format.html do
-          render_attachment_warning_if_needed(@news)
-          flash[:notice] = l(:notice_successful_update)
-          redirect_to news_path(@news)
-        end
-        format.api  {render_api_ok}
-      end
+      render_attachment_warning_if_needed(@news)
+      flash[:notice] = l(:notice_successful_update)
+      redirect_to news_path(@news)
     else
-      respond_to do |format|
-        format.html {render :action => 'edit'}
-        format.api  {render_validation_errors(@news)}
-      end
+      render :action => 'edit'
     end
   end
 
   def destroy
     @news.destroy
-    respond_to do |format|
-      format.html do
-        flash[:notice] = l(:notice_successful_delete)
-        redirect_to project_news_index_path(@project)
-      end
-      format.api  {render_api_ok}
-    end
+    redirect_to project_news_index_path(@project)
+  end
+
+  private
+
+  def find_optional_project
+    return true unless params[:project_id]
+    @project = Project.find(params[:project_id])
+    authorize
+  rescue ActiveRecord::RecordNotFound
+    render_404
   end
 end

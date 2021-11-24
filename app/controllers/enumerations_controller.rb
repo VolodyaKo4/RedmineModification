@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,12 +17,11 @@
 
 class EnumerationsController < ApplicationController
   layout 'admin'
-  self.main_menu = false
 
-  before_action :require_admin, :except => :index
-  before_action :require_admin_or_api_request, :only => :index
-  before_action :build_new_enumeration, :only => [:new, :create]
-  before_action :find_enumeration, :only => [:edit, :update, :destroy]
+  before_filter :require_admin, :except => :index
+  before_filter :require_admin_or_api_request, :only => :index
+  before_filter :build_new_enumeration, :only => [:new, :create]
+  before_filter :find_enumeration, :only => [:edit, :update, :destroy]
   accept_api_auth :index
 
   helper :custom_fields
@@ -32,14 +29,14 @@ class EnumerationsController < ApplicationController
   def index
     respond_to do |format|
       format.html
-      format.api do
+      format.api {
         @klass = Enumeration.get_subclass(params[:type])
         if @klass
-          @enumerations = @klass.shared.sorted.to_a
+          @enumerations = @klass.shared.sorted.all
         else
           render_404
         end
-      end
+      }
     end
   end
 
@@ -59,19 +56,11 @@ class EnumerationsController < ApplicationController
   end
 
   def update
-    if @enumeration.update(enumeration_params)
-      respond_to do |format|
-        format.html do
-          flash[:notice] = l(:notice_successful_update)
-          redirect_to enumerations_path
-        end
-        format.js {head 200}
-      end
+    if request.put? && @enumeration.update_attributes(params[:enumeration])
+      flash[:notice] = l(:notice_successful_update)
+      redirect_to enumerations_path
     else
-      respond_to do |format|
-        format.html {render :action => 'edit'}
-        format.js {head 422}
-      end
+      render :action => 'edit'
     end
   end
 
@@ -86,17 +75,15 @@ class EnumerationsController < ApplicationController
       redirect_to enumerations_path
       return
     end
-    @enumerations = @enumeration.class.system.to_a - [@enumeration]
+    @enumerations = @enumeration.class.system.all - [@enumeration]
   end
 
   private
 
   def build_new_enumeration
     class_name = params[:enumeration] && params[:enumeration][:type] || params[:type]
-    @enumeration = Enumeration.new_subclass_instance(class_name)
-    if @enumeration
-      @enumeration.attributes = enumeration_params || {}
-    else
+    @enumeration = Enumeration.new_subclass_instance(class_name, params[:enumeration])
+    if @enumeration.nil?
       render_404
     end
   end
@@ -105,11 +92,5 @@ class EnumerationsController < ApplicationController
     @enumeration = Enumeration.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render_404
-  end
-
-  def enumeration_params
-    # can't require enumeration on #new action
-    cf_ids = @enumeration.available_custom_fields.map {|c| c.multiple? ? {c.id.to_s => []} : c.id.to_s}
-    params.permit(:enumeration => [:name, :active, :is_default, :position, :custom_field_values => cf_ids])[:enumeration]
   end
 end

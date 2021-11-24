@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,26 +17,21 @@
 
 class RolesController < ApplicationController
   layout 'admin'
-  self.main_menu = false
 
-  before_action :require_admin, :except => [:index, :show]
-  before_action :require_admin_or_api_request, :only => [:index, :show]
-  before_action :find_role, :only => [:show, :edit, :update, :destroy]
+  before_filter :require_admin, :except => [:index, :show]
+  before_filter :require_admin_or_api_request, :only => [:index, :show]
+  before_filter :find_role, :only => [:show, :edit, :update, :destroy]
   accept_api_auth :index, :show
-
-  include RolesHelper
-
-  require_sudo_mode :create, :update, :destroy
 
   def index
     respond_to do |format|
-      format.html do
-        @roles = Role.sorted.to_a
-        render :layout => false if request.xhr?
-      end
-      format.api do
-        @roles = Role.givable.to_a
-      end
+      format.html {
+        @role_pages, @roles = paginate Role.sorted, :per_page => 25
+        render :action => "index", :layout => false if request.xhr?
+      }
+      format.api {
+        @roles = Role.givable.all
+      }
     end
   end
 
@@ -50,26 +43,24 @@ class RolesController < ApplicationController
 
   def new
     # Prefills the form with 'Non member' role permissions by default
-    @role = Role.new
-    @role.safe_attributes = params[:role] || {:permissions => Role.non_member.permissions}
+    @role = Role.new(params[:role] || {:permissions => Role.non_member.permissions})
     if params[:copy].present? && @copy_from = Role.find_by_id(params[:copy])
       @role.copy_from(@copy_from)
     end
-    @roles = Role.sorted.to_a
+    @roles = Role.sorted.all
   end
 
   def create
-    @role = Role.new
-    @role.safe_attributes = params[:role]
+    @role = Role.new(params[:role])
     if request.post? && @role.save
       # workflow copy
       if !params[:copy_workflow_from].blank? && (copy_from = Role.find_by_id(params[:copy_workflow_from]))
-        @role.copy_workflow_rules(copy_from)
+        @role.workflow_rules.copy(copy_from)
       end
       flash[:notice] = l(:notice_successful_create)
       redirect_to roles_path
     else
-      @roles = Role.sorted.to_a
+      @roles = Role.sorted.all
       render :action => 'new'
     end
   end
@@ -78,55 +69,33 @@ class RolesController < ApplicationController
   end
 
   def update
-    @role.safe_attributes = params[:role]
-    if @role.save
-      respond_to do |format|
-        format.html do
-          flash[:notice] = l(:notice_successful_update)
-          redirect_to roles_path(:page => params[:page])
-        end
-        format.js {head 200}
-      end
+    if request.put? and @role.update_attributes(params[:role])
+      flash[:notice] = l(:notice_successful_update)
+      redirect_to roles_path
     else
-      respond_to do |format|
-        format.html {render :action => 'edit'}
-        format.js   {head 422}
-      end
+      render :action => 'edit'
     end
   end
 
   def destroy
-    begin
-      @role.destroy
-    rescue
-      flash[:error] =  l(:error_can_not_remove_role)
-    end
+    @role.destroy
+    redirect_to roles_path
+  rescue
+    flash[:error] =  l(:error_can_not_remove_role)
     redirect_to roles_path
   end
 
   def permissions
-    scope = Role.sorted
-    if params[:ids].present?
-      scope = scope.where(:id => params[:ids])
-    end
-    @roles = scope.to_a
-    @permissions = Redmine::AccessControl.permissions.reject(&:public?)
-    respond_to do |format|
-      format.html
-      format.csv do
-        send_data(permissions_to_csv(@roles, @permissions), :type => 'text/csv; header=present', :filename => 'permissions.csv')
+    @roles = Role.sorted.all
+    @permissions = Redmine::AccessControl.permissions.select { |p| !p.public? }
+    if request.post?
+      @roles.each do |role|
+        role.permissions = params[:permissions][role.id.to_s]
+        role.save
       end
+      flash[:notice] = l(:notice_successful_update)
+      redirect_to roles_path
     end
-  end
-
-  def update_permissions
-    @roles = Role.where(:id => params[:permissions].keys)
-    @roles.each do |role|
-      role.permissions = params[:permissions][role.id.to_s]
-      role.save
-    end
-    flash[:notice] = l(:notice_successful_update)
-    redirect_to roles_path
   end
 
   private

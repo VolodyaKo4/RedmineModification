@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,37 +17,35 @@
 
 class TrackersController < ApplicationController
   layout 'admin'
-  self.main_menu = false
 
-  before_action :require_admin, :except => :index
-  before_action :require_admin_or_api_request, :only => :index
+  before_filter :require_admin, :except => :index
+  before_filter :require_admin_or_api_request, :only => :index
   accept_api_auth :index
 
   def index
-    @trackers = Tracker.sorted.to_a
     respond_to do |format|
-      format.html {render :layout => false if request.xhr?}
-      format.api
+      format.html {
+        @tracker_pages, @trackers = paginate Tracker.sorted, :per_page => 25
+        render :action => "index", :layout => false if request.xhr?
+      }
+      format.api {
+        @trackers = Tracker.sorted.all
+      }
     end
   end
 
   def new
-    @tracker ||= Tracker.new(:default_status => IssueStatus.sorted.first)
-    @tracker.safe_attributes = params[:tracker]
-    if params[:copy].present? && @copy_from = Tracker.find_by_id(params[:copy])
-      @tracker.copy_from(@copy_from)
-    end
-    @trackers = Tracker.sorted.to_a
+    @tracker ||= Tracker.new(params[:tracker])
+    @trackers = Tracker.sorted.all
     @projects = Project.all
   end
 
   def create
-    @tracker = Tracker.new
-    @tracker.safe_attributes = params[:tracker]
+    @tracker = Tracker.new(params[:tracker])
     if @tracker.save
       # workflow copy
       if !params[:copy_workflow_from].blank? && (copy_from = Tracker.find_by_id(params[:copy_workflow_from]))
-        @tracker.copy_workflow_rules(copy_from)
+        @tracker.workflow_rules.copy(copy_from)
       end
       flash[:notice] = l(:notice_successful_create)
       redirect_to trackers_path
@@ -66,24 +62,13 @@ class TrackersController < ApplicationController
 
   def update
     @tracker = Tracker.find(params[:id])
-    @tracker.safe_attributes = params[:tracker]
-    if @tracker.save
-      respond_to do |format|
-        format.html do
-          flash[:notice] = l(:notice_successful_update)
-          redirect_to trackers_path(:page => params[:page])
-        end
-        format.js {head 200}
-      end
-    else
-      respond_to do |format|
-        format.html do
-          edit
-          render :action => 'edit'
-        end
-        format.js {head 422}
-      end
+    if @tracker.update_attributes(params[:tracker])
+      flash[:notice] = l(:notice_successful_update)
+      redirect_to trackers_path
+      return
     end
+    edit
+    render :action => 'edit'
   end
 
   def destroy
@@ -110,7 +95,7 @@ class TrackersController < ApplicationController
       redirect_to fields_trackers_path
       return
     end
-    @trackers = Tracker.sorted.to_a
-    @custom_fields = IssueCustomField.sorted
+    @trackers = Tracker.sorted.all
+    @custom_fields = IssueCustomField.all.sort
   end
 end

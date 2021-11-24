@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,28 +16,28 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class PreviewsController < ApplicationController
-  before_action :find_project, :except => :text
-  before_action :find_attachments
+  before_filter :find_project, :find_attachments
 
   def issue
-    @issue = Issue.visible.find_by_id(params[:issue_id]) unless params[:issue_id].blank?
+    @issue = @project.issues.find_by_id(params[:id]) unless params[:id].blank?
     if @issue
-      @previewed = @issue
+      @description = params[:issue] && params[:issue][:description]
+      if @description && @description.gsub(/(\r?\n|\n\r?)/, "\n") == @issue.description.to_s.gsub(/(\r?\n|\n\r?)/, "\n")
+        @description = nil
+      end
+      # params[:notes] is useful for preview of notes in issue history
+      @notes = params[:notes] || (params[:issue] ? params[:issue][:notes] : nil)
+    else
+      @description = (params[:issue] ? params[:issue][:description] : nil)
     end
-    @text = params[:text] ? params[:text] : nil
-    render :partial => 'common/preview'
+    render :layout => false
   end
 
   def news
     if params[:id].present? && news = News.visible.find_by_id(params[:id])
       @previewed = news
     end
-    @text = params[:text] ? params[:text] : nil
-    render :partial => 'common/preview'
-  end
-
-  def text
-    @text = params[:text] ? params[:text] : nil
+    @text = (params[:news] ? params[:news][:description] : nil)
     render :partial => 'common/preview'
   end
 
@@ -51,4 +49,5 @@ class PreviewsController < ApplicationController
   rescue ActiveRecord::RecordNotFound
     render_404
   end
+
 end

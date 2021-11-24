@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,100 +17,79 @@
 
 class ProjectsController < ApplicationController
   menu_item :overview
+  menu_item :roadmap, :only => :roadmap
   menu_item :settings, :only => :settings
-  menu_item :projects, :only => [:index, :new, :copy, :create]
 
-  before_action :find_project,
-                :except => [:index, :autocomplete, :list, :new, :create, :copy]
-  before_action :authorize,
-                :except => [:index, :autocomplete, :list, :new, :create, :copy,
-                            :archive, :unarchive,
-                            :destroy]
-  before_action :authorize_global, :only => [:new, :create]
-  before_action :require_admin, :only => [:copy, :archive, :unarchive]
+  before_filter :find_project, :except => [ :index, :list, :new, :create, :copy ]
+  before_filter :authorize, :except => [ :index, :list, :new, :create, :copy, :archive, :unarchive, :destroy]
+  before_filter :authorize_global, :only => [:new, :create]
+  before_filter :require_admin, :only => [ :copy, :archive, :unarchive, :destroy ]
   accept_rss_auth :index
   accept_api_auth :index, :show, :create, :update, :destroy
-  require_sudo_mode :destroy
 
-  helper :custom_fields
-  helper :issues
-  helper :queries
-  include QueriesHelper
-  helper :projects_queries
-  include ProjectsQueriesHelper
-  helper :repositories
-  helper :members
-  helper :trackers
-
-  # Lists visible projects
-  def index
-    # try to redirect to the requested menu item
-    if params[:jump] && redirect_to_menu_item(params[:jump])
-      return
-    end
-
-    retrieve_project_query
-    scope = project_scope
-
-    respond_to do |format|
-      format.html do
-        # TODO: see what to do with the board view and pagination
-        if @query.display_type == 'board'
-          @entries = scope.to_a
-        else
-          @entry_count = scope.count
-          @entry_pages = Paginator.new @entry_count, per_page_option, params['page']
-          @entries = scope.offset(@entry_pages.offset).limit(@entry_pages.per_page).to_a
-        end
-      end
-      format.api do
-        @offset, @limit = api_offset_and_limit
-        @project_count = scope.count
-        @projects = scope.offset(@offset).limit(@limit).to_a
-      end
-      format.atom do
-        projects = scope.reorder(:created_on => :desc).limit(Setting.feeds_limit.to_i).to_a
-        render_feed(projects, :title => "#{Setting.app_title}: #{l(:label_project_latest)}")
-      end
-      format.csv do
-        # Export all entries
-        @entries = scope.to_a
-        send_data(query_to_csv(@entries, @query, params), :type => 'text/csv; header=present', :filename => 'projects.csv')
-      end
+  after_filter :only => [:create, :edit, :update, :archive, :unarchive, :destroy] do |controller|
+    if controller.request.post?
+      controller.send :expire_action, :controller => 'welcome', :action => 'robots'
     end
   end
 
-  def autocomplete
+  helper :sort
+  include SortHelper
+  helper :custom_fields
+  include CustomFieldsHelper
+  helper :issues
+  helper :queries
+  include QueriesHelper
+  helper :repositories
+  include RepositoriesHelper
+  include ProjectsHelper
+  helper :members
+
+  # Lists visible projects
+  def index
     respond_to do |format|
-      format.js do
-        if params[:q].present?
-          @projects = Project.visible.like(params[:q]).to_a
-        else
-          @projects = User.current.projects.to_a
+      format.html {
+        scope = Project
+        unless params[:closed]
+          scope = scope.active
         end
-      end
+        @projects = scope.visible.order('lft').all
+      }
+      format.api  {
+        @offset, @limit = api_offset_and_limit
+        @project_count = Project.visible.count
+        @projects = Project.visible.offset(@offset).limit(@limit).order('lft').all
+      }
+      format.atom {
+        projects = Project.visible.order('created_on DESC').limit(Setting.feeds_limit.to_i).all
+        render_feed(projects, :title => "#{Setting.app_title}: #{l(:label_project_latest)}")
+      }
     end
   end
 
   def new
-    @issue_custom_fields = IssueCustomField.sorted.to_a
-    @trackers = Tracker.sorted.to_a
+    @issue_custom_fields = IssueCustomField.sorted.all
+    @trackers = Tracker.sorted.all
     @project = Project.new
     @project.safe_attributes = params[:project]
   end
 
   def create
-    @issue_custom_fields = IssueCustomField.sorted.to_a
-    @trackers = Tracker.sorted.to_a
+    @issue_custom_fields = IssueCustomField.sorted.all
+    @trackers = Tracker.sorted.all
     @project = Project.new
     @project.safe_attributes = params[:project]
 
-    if @project.save
+    if validate_parent_id && @project.save
+      @project.set_allowed_parent!(params[:project]['parent_id']) if params[:project].has_key?('parent_id')
+      # Add current user as a project member if current user is not admin
       unless User.current.admin?
-        @project.add_default_member(User.current)
+        r = Role.givable.find_by_id(Setting.new_project_user_role_id.to_i) || Role.givable.first
+        m = Member.new(:user => User.current, :roles => [r])
+        @project.members << m
       end
       respond_to do |format|
-        format.html do
+        format.html {
           flash[:notice] = l(:notice_successful_create)
           if params[:continue]
             attrs = {:parent_id => @project.parent_id}.reject {|k,v| v.nil?}
@@ -120,27 +97,20 @@ class ProjectsController < ApplicationController
           else
             redirect_to settings_project_path(@project)
           end
-        end
-        format.api do
-          render(
-            :action => 'show',
-            :status => :created,
-            :location => url_for(:controller => 'projects',
-                                 :action => 'show', :id => @project.id)
-          )
-        end
+        }
+        format.api  { render :action => 'show', :status => :created, :location => url_for(:controller => 'projects', :action => 'show', :id => @project.id) }
       end
     else
       respond_to do |format|
-        format.html {render :action => 'new'}
-        format.api  {render_validation_errors(@project)}
+        format.html { render :action => 'new' }
+        format.api  { render_validation_errors(@project) }
       end
     end
   end
 
   def copy
-    @issue_custom_fields = IssueCustomField.sorted.to_a
-    @trackers = Tracker.sorted.to_a
+    @issue_custom_fields = IssueCustomField.sorted.all
+    @trackers = Tracker.sorted.all
     @source_project = Project.find(params[:id])
     if request.get?
       @project = Project.copy_from(@source_project)
@@ -149,7 +119,8 @@ class ProjectsController < ApplicationController
       Mailer.with_deliveries(params[:notifications] == '1') do
         @project = Project.new
         @project.safe_attributes = params[:project]
-        if @project.copy(@source_project, :only => params[:only])
+        if validate_parent_id && @project.copy(@source_project, :only => params[:only])
+          @project.set_allowed_parent!(params[:project]['parent_id']) if params[:project].has_key?('parent_id')
           flash[:notice] = l(:notice_successful_create)
           redirect_to settings_project_path(@project)
         elsif !@project.new_record?
@@ -173,20 +144,18 @@ class ProjectsController < ApplicationController
       return
     end
 
-    @principals_by_role = @project.principals_by_role
-    @subprojects = @project.children.visible.to_a
-    @news = @project.news.limit(5).includes(:author, :project).reorder("#{News.table_name}.created_on DESC").to_a
-    with_subprojects = Setting.display_subprojects_issues?
-    @trackers = @project.rolled_up_trackers(with_subprojects).visible
+    @users_by_role = @project.users_by_role
+    @subprojects = @project.children.visible.all
+    @news = @project.news.limit(5).includes(:author, :project).reorder("#{News.table_name}.created_on DESC").all
+    @trackers = @project.rolled_up_trackers
 
-    cond = @project.project_condition(with_subprojects)
+    cond = @project.project_condition(Setting.display_subprojects_issues?)
 
     @open_issues_by_tracker = Issue.visible.open.where(cond).group(:tracker).count
     @total_issues_by_tracker = Issue.visible.where(cond).group(:tracker).count
 
-    if User.current.allowed_to_view_all_time_entries?(@project)
+    if User.current.allowed_to?(:view_time_entries, @project)
       @total_hours = TimeEntry.visible.where(cond).sum(:hours).to_f
-      @total_estimated_hours = Issue.visible.where(cond).sum(:estimated_hours).to_f
     end
 
     @key = User.current.rss_key
@@ -198,14 +167,11 @@ class ProjectsController < ApplicationController
   end
 
   def settings
-    @issue_custom_fields = IssueCustomField.sorted.to_a
+    @issue_custom_fields = IssueCustomField.sorted.all
     @issue_category ||= IssueCategory.new
     @member ||= @project.members.new
-    @trackers = Tracker.sorted.to_a
-
-    @version_status = params[:version_status] || 'open'
-    @version_name = params[:version_name]
-    @versions = @project.shared_versions.status(@version_status).like(@version_name).sorted
+    @trackers = Tracker.sorted.all
+    @wiki ||= @project.wiki
   end
 
   def edit
@@ -213,50 +179,44 @@ class ProjectsController < ApplicationController
 
   def update
     @project.safe_attributes = params[:project]
-    if @project.save
+    if validate_parent_id && @project.save
+      @project.set_allowed_parent!(params[:project]['parent_id']) if params[:project].has_key?('parent_id')
       respond_to do |format|
-        format.html do
+        format.html {
           flash[:notice] = l(:notice_successful_update)
-          redirect_to settings_project_path(@project, params[:tab])
-        end
-        format.api {render_api_ok}
+          redirect_to settings_project_path(@project)
+        }
+        format.api  { render_api_ok }
       end
     else
       respond_to do |format|
-        format.html do
+        format.html {
           settings
           render :action => 'settings'
-        end
-        format.api {render_validation_errors(@project)}
+        }
+        format.api  { render_validation_errors(@project) }
       end
     end
   end
 
+  def modules
+    @project.enabled_module_names = params[:enabled_module_names]
+    flash[:notice] = l(:notice_successful_update)
+    redirect_to settings_project_path(@project, :tab => 'modules')
+  end
+
   def archive
-    unless @project.archive
-      flash[:error] = l(:error_can_not_archive_project)
+    if request.post?
+      unless @project.archive
+        flash[:error] = l(:error_can_not_archive_project)
+      end
     end
-    redirect_to_referer_or admin_projects_path(:status => params[:status])
+    redirect_to admin_projects_path(:status => params[:status])
   end
 
   def unarchive
-    unless @project.active?
-      @project.unarchive
-    end
-    redirect_to_referer_or admin_projects_path(:status => params[:status])
-  end
-
-  def bookmark
-    jump_box = Redmine::ProjectJumpBox.new User.current
-    if request.delete?
-      jump_box.delete_project_bookmark @project
-    elsif request.post?
-      jump_box.bookmark_project @project
-    end
-    respond_to do |format|
-      format.js
-      format.html {redirect_to project_path(@project)}
-    end
+    @project.unarchive if request.post? && !@project.active?
+    redirect_to admin_projects_path(:status => params[:status])
   end
 
   def close
@@ -271,21 +231,12 @@ class ProjectsController < ApplicationController
 
   # Delete @project
   def destroy
-    unless @project.deletable?
-      deny_access
-      return
-    end
-
     @project_to_destroy = @project
-    if api_request? || params[:confirm] == @project_to_destroy.identifier
+    if api_request? || params[:confirm]
       @project_to_destroy.destroy
       respond_to do |format|
-        format.html do
-          redirect_to(
-            User.current.admin? ? admin_projects_path : projects_path
-          )
-        end
-        format.api  {render_api_ok}
+        format.html { redirect_to admin_projects_path }
+        format.api  { render_api_ok }
       end
     end
     # hide project in layout
@@ -294,12 +245,18 @@ class ProjectsController < ApplicationController
 
   private
 
-  # Returns the ProjectEntry scope for index
-  def project_scope(options={})
-    @query.results_scope(options)
-  end
-
-  def retrieve_project_query
-    retrieve_query(ProjectQuery, false, :defaults => @default_columns_names)
+  # Validates parent_id param according to user's permissions
+  # TODO: move it to Project model in a validation that depends on User.current
+  def validate_parent_id
+    return true if User.current.admin?
+    parent_id = params[:project] && params[:project][:parent_id]
+    if parent_id || @project.new_record?
+      parent = parent_id.blank? ? nil : Project.find_by_id(parent_id.to_i)
+      unless @project.allowed_parents.include?(parent)
+        @project.errors.add :parent_id, :invalid
+        return false
+      end
+    end
+    true
   end
 end

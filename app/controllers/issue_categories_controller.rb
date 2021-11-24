@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,22 +18,22 @@
 class IssueCategoriesController < ApplicationController
   menu_item :settings
   model_object IssueCategory
-  before_action :find_model_object, :except => [:index, :new, :create]
-  before_action :find_project_from_association, :except => [:index, :new, :create]
-  before_action :find_project_by_project_id, :only => [:index, :new, :create]
-  before_action :authorize
+  before_filter :find_model_object, :except => [:index, :new, :create]
+  before_filter :find_project_from_association, :except => [:index, :new, :create]
+  before_filter :find_project_by_project_id, :only => [:index, :new, :create]
+  before_filter :authorize
   accept_api_auth :index, :show, :create, :update, :destroy
 
   def index
     respond_to do |format|
-      format.html {redirect_to_settings_in_projects}
-      format.api {@categories = @project.issue_categories.to_a}
+      format.html { redirect_to_settings_in_projects }
+      format.api { @categories = @project.issue_categories.all }
     end
   end
 
   def show
     respond_to do |format|
-      format.html {redirect_to_settings_in_projects}
+      format.html { redirect_to_settings_in_projects }
       format.api
     end
   end
@@ -60,16 +58,13 @@ class IssueCategoriesController < ApplicationController
           redirect_to_settings_in_projects
         end
         format.js
-        format.api do
-          render(:action => 'show', :status => :created,
-                 :location => issue_category_path(@category))
-        end
+        format.api { render :action => 'show', :status => :created, :location => issue_category_path(@category) }
       end
     else
       respond_to do |format|
-        format.html {render :action => 'new'}
-        format.js   {render :action => 'new'}
-        format.api  {render_validation_errors(@category)}
+        format.html { render :action => 'new'}
+        format.js   { render :action => 'new'}
+        format.api { render_validation_errors(@category) }
       end
     end
   end
@@ -81,16 +76,16 @@ class IssueCategoriesController < ApplicationController
     @category.safe_attributes = params[:issue_category]
     if @category.save
       respond_to do |format|
-        format.html do
+        format.html {
           flash[:notice] = l(:notice_successful_update)
           redirect_to_settings_in_projects
-        end
-        format.api {render_api_ok}
+        }
+        format.api { render_api_ok }
       end
     else
       respond_to do |format|
-        format.html {render :action => 'edit'}
-        format.api {render_validation_errors(@category)}
+        format.html { render :action => 'edit' }
+        format.api { render_validation_errors(@category) }
       end
     end
   end
@@ -104,8 +99,8 @@ class IssueCategoriesController < ApplicationController
       end
       @category.destroy(reassign_to)
       respond_to do |format|
-        format.html {redirect_to_settings_in_projects}
-        format.api {render_api_ok}
+        format.html { redirect_to_settings_in_projects }
+        format.api { render_api_ok }
       end
       return
     end
