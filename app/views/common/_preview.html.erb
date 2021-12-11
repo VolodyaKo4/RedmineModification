@@ -1,5 +1,3 @@
-<% unless @text.blank? %>
-  <%= textilizable @text, :attachments => @attachments, :object => @previewed %>
-<% else	%>
-  <p class="empty-preview"><%= l(:label_nothing_to_preview) %></p>
-<% end %>
+<fieldset class="preview"><legend><%= l(:label_preview) %></legend>
+<%= textilizable @text, :attachments => @attachments, :object => @previewed %>
+</fieldset>

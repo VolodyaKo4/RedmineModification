@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,9 +17,17 @@
 
 require File.expand_path('../../../test_helper', __FILE__)
 
-class RoutingProjectEnumerationsTest < Redmine::RoutingTest
+class RoutingProjectEnumerationsTest < ActionController::IntegrationTest
   def test_project_enumerations
-    should_route 'PUT /projects/foo/enumerations' => 'project_enumerations#update', :project_id => 'foo'
-    should_route 'DELETE /projects/foo/enumerations' => 'project_enumerations#destroy', :project_id => 'foo'
+    assert_routing(
+        { :method => 'put', :path => "/projects/64/enumerations" },
+        { :controller => 'project_enumerations', :action => 'update',
+          :project_id => '64' }
+      )
+    assert_routing(
+        { :method => 'delete', :path => "/projects/64/enumerations" },
+        { :controller => 'project_enumerations', :action => 'destroy',
+          :project_id => '64' }
+      )
   end
 end

@@ -7,6 +7,5 @@ class Meeting < ActiveRecord::Base
                 :url => Proc.new {|o| {:controller => 'meetings', :action => 'show', :id => o.id}}
 
   acts_as_activity_provider :timestamp => 'scheduled_on',
-                            :scope => proc { includes(:project) },
-                            :permission => nil
+                            :find_options => { :include => :project }
 end

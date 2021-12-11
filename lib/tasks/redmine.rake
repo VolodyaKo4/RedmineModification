@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -25,11 +25,6 @@ namespace :redmine do
     desc 'Moves attachments stored at the root of the file directory (ie. created before Redmine 2.3) to their subdirectories'
     task :move_to_subdirectories => :environment do
       Attachment.move_from_root_to_target_directory
-    end
-
-    desc 'Updates attachment digests to SHA256'
-    task :update_digests => :environment do
-      Attachment.update_digests_to_sha256
     end
   end
 
@@ -73,8 +68,7 @@ DESC
     tables = ActiveRecord::Base.connection.tables.sort - %w(schema_migrations plugin_schema_info)
 
     if (tables - target_tables).any?
-      list = (tables - target_tables).map {|table| "* #{table}"}.join("\n")
-      abort "The following table(s) are missing from the target database:\n#{list}"
+      abort "The following table(s) are missing from the target database: #{(tables - target_tables).join(', ')}"
     end
 
     tables.each do |table_name|
@@ -108,9 +102,6 @@ DESC
       Target.connection.reset_pk_sequence!(table_name) if Target.primary_key
       target_count = Target.count
       abort "Some records were not migrated" unless source_count == target_count
-
-      Object.send(:remove_const, :Target)
-      Object.send(:remove_const, :Source)
     end
   end
 
@@ -137,12 +128,7 @@ DESC
         abort "Plugin #{name} was not found."
       end
 
-      case ActiveRecord::Base.schema_format
-      when :ruby
-        Rake::Task["db:schema:dump"].invoke
-      when :sql
-        Rake::Task["db:structure:dump"].invoke
-      end
+      Rake::Task["db:schema:dump"].invoke
     end
 
     desc 'Copies plugins assets into the public directory.'
@@ -161,38 +147,28 @@ DESC
       Rake::Task["redmine:plugins:test:units"].invoke
       Rake::Task["redmine:plugins:test:functionals"].invoke
       Rake::Task["redmine:plugins:test:integration"].invoke
-      Rake::Task["redmine:plugins:test:system"].invoke
     end
 
     namespace :test do
       desc 'Runs the plugins unit tests.'
-      task :units => "db:test:prepare" do |t|
-        $: << "test"
-        Rails::TestUnit::Runner.rake_run ["plugins/#{ENV['NAME'] || '*'}/test/unit/**/*_test.rb"]
+      Rake::TestTask.new :units => "db:test:prepare" do |t|
+        t.libs << "test"
+        t.verbose = true
+        t.pattern = "plugins/#{ENV['NAME'] || '*'}/test/unit/**/*_test.rb"
       end
 
       desc 'Runs the plugins functional tests.'
-      task :functionals => "db:test:prepare" do |t|
-        $: << "test"
-        Rails::TestUnit::Runner.rake_run ["plugins/#{ENV['NAME'] || '*'}/test/functional/**/*_test.rb"]
+      Rake::TestTask.new :functionals => "db:test:prepare" do |t|
+        t.libs << "test"
+        t.verbose = true
+        t.pattern = "plugins/#{ENV['NAME'] || '*'}/test/functional/**/*_test.rb"
       end
 
       desc 'Runs the plugins integration tests.'
-      task :integration => "db:test:prepare" do |t|
-        $: << "test"
-        Rails::TestUnit::Runner.rake_run ["plugins/#{ENV['NAME'] || '*'}/test/integration/**/*_test.rb"]
-      end
-
-      desc 'Runs the plugins system tests.'
-      task :system => "db:test:prepare" do |t|
-        $: << "test"
-        Rails::TestUnit::Runner.rake_run ["plugins/#{ENV['NAME'] || '*'}/test/system/**/*_test.rb"]
-      end
-
-      desc 'Runs the plugins ui tests.'
-      task :ui => "db:test:prepare" do |t|
-        $: << "test"
-        Rails::TestUnit::Runner.rake_run ["plugins/#{ENV['NAME'] || '*'}/test/ui/**/*_test.rb"]
+      Rake::TestTask.new :integration => "db:test:prepare" do |t|
+        t.libs << "test"
+        t.verbose = true
+        t.pattern = "plugins/#{ENV['NAME'] || '*'}/test/integration/**/*_test.rb"
       end
     end
   end

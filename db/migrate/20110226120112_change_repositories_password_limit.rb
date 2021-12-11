@@ -1,4 +1,4 @@
-class ChangeRepositoriesPasswordLimit < ActiveRecord::Migration[4.2]
+class ChangeRepositoriesPasswordLimit < ActiveRecord::Migration
   def self.up
     change_column :repositories, :password, :string, :limit => nil, :default => ''
   end

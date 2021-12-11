@@ -1,4 +1,4 @@
-class AddRolesBuiltin < ActiveRecord::Migration[4.2]
+class AddRolesBuiltin < ActiveRecord::Migration
   def self.up
     add_column :roles, :builtin, :integer, :default => 0, :null => false
   end

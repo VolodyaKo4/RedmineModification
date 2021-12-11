@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,9 +17,15 @@
 
 require File.expand_path('../../../test_helper', __FILE__)
 
-class RoutingSearchTest < Redmine::RoutingTest
+class RoutingSearchTest < ActionController::IntegrationTest
   def test_search
-    should_route 'GET /search' => 'search#index'
-    should_route 'GET /projects/foo/search' => 'search#index', :id => 'foo'
+    assert_routing(
+        { :method => 'get', :path => "/search" },
+        { :controller => 'search', :action => 'index' }
+      )
+    assert_routing(
+        { :method => 'get', :path => "/projects/foo/search" },
+        { :controller => 'search', :action => 'index', :id => 'foo' }
+      )
   end
 end

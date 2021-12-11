@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -17,7 +15,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-class ScmFetchError < StandardError; end
+class ScmFetchError < Exception; end
 
 class Repository < ActiveRecord::Base
   include Redmine::Ciphering
@@ -27,41 +25,36 @@ class Repository < ActiveRecord::Base
   IDENTIFIER_MAX_LENGTH = 255
 
   belongs_to :project
-  has_many :changesets, lambda{order("#{Changeset.table_name}.committed_on DESC, #{Changeset.table_name}.id DESC")}
+  has_many :changesets, :order => "#{Changeset.table_name}.committed_on DESC, #{Changeset.table_name}.id DESC"
   has_many :filechanges, :class_name => 'Change', :through => :changesets
 
   serialize :extra_info
 
-  before_validation :normalize_identifier
   before_save :check_default
 
   # Raw SQL to delete changesets and changes in the database
   # has_many :changesets, :dependent => :destroy is too slow for big repositories
   before_destroy :clear_changesets
 
-  validates_length_of :login, maximum: 60, allow_nil: true
   validates_length_of :password, :maximum => 255, :allow_nil => true
-  validates_length_of :root_url, :url, maximum: 255
   validates_length_of :identifier, :maximum => IDENTIFIER_MAX_LENGTH, :allow_blank => true
-  validates_uniqueness_of :identifier, :scope => :project_id
-  validates_exclusion_of :identifier, :in => %w(browse show entry raw changes annotate diff statistics graph revisions revision)
+  validates_presence_of :identifier, :unless => Proc.new { |r| r.is_default? || r.set_as_default? }
+  validates_uniqueness_of :identifier, :scope => :project_id, :allow_blank => true
+  validates_exclusion_of :identifier, :in => %w(show entry raw changes annotate diff show stats graph)
   # donwcase letters, digits, dashes, underscores but not digits only
   validates_format_of :identifier, :with => /\A(?!\d+$)[a-z0-9\-_]*\z/, :allow_blank => true
   # Checks if the SCM is enabled when creating a repository
   validate :repo_create_validation, :on => :create
-  validate :validate_repository_path
 
-  safe_attributes(
-    'identifier',
+  safe_attributes 'identifier',
     'login',
     'password',
     'path_encoding',
     'log_encoding',
-    'is_default')
+    'is_default'
 
-  safe_attributes(
-    'url',
-    :if => lambda {|repository, user| repository.new_record?})
+  safe_attributes 'url',
+    :if => lambda {|repository, user| repository.new_record?}
 
   def repo_create_validation
     unless Setting.enabled_scm.include?(self.class.name.demodulize)
@@ -133,7 +126,9 @@ class Repository < ActiveRecord::Base
   end
 
   def identifier_param
-    if identifier.present?
+    if is_default?
+      nil
+    elsif identifier.present?
       identifier
     else
       id.to_s
@@ -151,7 +146,7 @@ class Repository < ActiveRecord::Base
   end
 
   def self.find_by_identifier_param(param)
-    if /^\d+$/.match?(param.to_s)
+    if param.to_s =~ /^\d+$/
       find_by_id(param)
     else
       find_by_identifier(param)
@@ -167,7 +162,6 @@ class Repository < ActiveRecord::Base
   def merge_extra_info(arg)
     h = extra_info || {}
     return h if arg.nil?
-
     h.merge!(arg)
     write_attribute(:extra_info, h)
   end
@@ -237,8 +231,8 @@ class Repository < ActiveRecord::Base
 
   def diff_format_revisions(cs, cs_to, sep=':')
     text = ""
-    text += cs_to.format_identifier + sep if cs_to
-    text += cs.format_identifier if cs
+    text << cs_to.format_identifier + sep if cs_to
+    text << cs.format_identifier if cs
     text
   end
 
@@ -250,10 +244,9 @@ class Repository < ActiveRecord::Base
   # Finds and returns a revision with a number or the beginning of a hash
   def find_changeset_by_name(name)
     return nil if name.blank?
-
     s = name.to_s
-    if /^\d*$/.match?(s)
-      changesets.find_by(:revision => s)
+    if s.match(/^\d*$/)
+      changesets.where("revision = ?", s).first
     else
       changesets.where("revision LIKE ?", s + '%').first
     end
@@ -271,7 +264,7 @@ class Repository < ActiveRecord::Base
         reorder("#{Changeset.table_name}.committed_on DESC, #{Changeset.table_name}.id DESC").
         limit(limit).
         preload(:user).
-        to_a
+        all
     else
       filechanges.
         where("path = ?", path.with_leading_slash).
@@ -288,7 +281,8 @@ class Repository < ActiveRecord::Base
 
   # Returns an array of committers usernames and associated user_id
   def committers
-    @committers ||= Changeset.where(:repository_id => id).distinct.pluck(:committer, :user_id)
+    @committers ||= Changeset.connection.select_rows(
+         "SELECT DISTINCT committer, user_id FROM #{Changeset.table_name} WHERE repository_id = #{id}")
   end
 
   # Maps committers username to a user ids
@@ -319,8 +313,7 @@ class Repository < ActiveRecord::Base
       return @found_committer_users[committer] if @found_committer_users.has_key?(committer)
 
       user = nil
-      c = changesets.where(:committer => committer).
-            includes(:user).references(:user).first
+      c = changesets.where(:committer => committer).includes(:user).first
       if c && c.user
         user = c.user
       elsif committer.strip =~ /^([^<]+)(<(.*)>)?$/
@@ -368,14 +361,10 @@ class Repository < ActiveRecord::Base
   end
 
   def self.factory(klass_name, *args)
-    repository_class(klass_name).new(*args) rescue nil
-  end
-
-  def self.repository_class(class_name)
-    class_name = class_name.to_s.camelize
-    if Redmine::Scm::Base.all.include?(class_name)
-      "Repository::#{class_name}".constantize
-    end
+    klass = "Repository::#{klass_name}".constantize
+    klass.new(*args)
+  rescue
+    nil
   end
 
   def self.scm_adapter_class
@@ -386,7 +375,7 @@ class Repository < ActiveRecord::Base
     ret = ""
     begin
       ret = self.scm_adapter_class.client_command if self.scm_adapter_class
-    rescue => e
+    rescue Exception => e
       logger.error "scm: error during get command: #{e.message}"
     end
     ret
@@ -396,7 +385,7 @@ class Repository < ActiveRecord::Base
     ret = ""
     begin
       ret = self.scm_adapter_class.client_version_string if self.scm_adapter_class
-    rescue => e
+    rescue Exception => e
       logger.error "scm: error during get version string: #{e.message}"
     end
     ret
@@ -406,7 +395,7 @@ class Repository < ActiveRecord::Base
     ret = false
     begin
       ret = self.scm_adapter_class.client_available if self.scm_adapter_class
-    rescue => e
+    rescue Exception => e
       logger.error "scm: error during get scm available: #{e.message}"
     end
     ret
@@ -416,74 +405,7 @@ class Repository < ActiveRecord::Base
     new_record? && project && Repository.where(:project_id => project.id).empty?
   end
 
-  # Returns a hash with statistics by author in the following form:
-  # {
-  #   "John Smith" => { :commits => 45, :changes => 324 },
-  #   "Bob" => { ... }
-  # }
-  #
-  # Notes:
-  # - this hash honnors the users mapping defined for the repository
-  def stats_by_author
-    commits = Changeset.where("repository_id = ?", id).
-                select("committer, user_id, count(*) as count").group("committer, user_id")
-    # TODO: restore ordering ; this line probably never worked
-    # commits.to_a.sort! {|x, y| x.last <=> y.last}
-    changes = Change.joins(:changeset).where("#{Changeset.table_name}.repository_id = ?", id).
-                select("committer, user_id, count(*) as count").group("committer, user_id")
-    user_ids = changesets.map(&:user_id).compact.uniq
-    authors_names = User.where(:id => user_ids).inject({}) do |memo, user|
-      memo[user.id] = user.to_s
-      memo
-    end
-    (commits + changes).inject({}) do |hash, element|
-      mapped_name = element.committer
-      if username = authors_names[element.user_id.to_i]
-        mapped_name = username
-      end
-      hash[mapped_name] ||= {:commits_count => 0, :changes_count => 0}
-      if element.is_a?(Changeset)
-        hash[mapped_name][:commits_count] += element.count.to_i
-      else
-        hash[mapped_name][:changes_count] += element.count.to_i
-      end
-      hash
-    end
-  end
-
-  # Returns a scope of changesets that come from the same commit as the given changeset
-  # in different repositories that point to the same backend
-  def same_commits_in_scope(scope, changeset)
-    scope = scope.joins(:repository).where(:repositories => {:url => url, :root_url => root_url, :type => type})
-    if changeset.scmid.present?
-      scope = scope.where(:scmid => changeset.scmid)
-    else
-      scope = scope.where(:revision => changeset.revision)
-    end
-    scope
-  end
-
-  def valid_name?(name)
-    scm.valid_name?(name)
-  end
-
   protected
-
-  # Validates repository url based against an optional regular expression
-  # that can be set in the Redmine configuration file.
-  def validate_repository_path(attribute=:url)
-    regexp = Redmine::Configuration["scm_#{scm_name.to_s.downcase}_path_regexp"]
-    if changes[attribute] && regexp.present?
-      regexp = regexp.to_s.strip.gsub('%project%') {Regexp.escape(project.try(:identifier).to_s)}
-      unless Regexp.new("\\A#{regexp}\\z").match?(send(attribute).to_s)
-        errors.add(attribute, :invalid)
-      end
-    end
-  end
-
-  def normalize_identifier
-    self.identifier = identifier.to_s.strip
-  end
 
   def check_default
     if !is_default? && set_as_default?
@@ -513,9 +435,13 @@ class Repository < ActiveRecord::Base
     ci = "#{table_name_prefix}changesets_issues#{table_name_suffix}"
     cp = "#{table_name_prefix}changeset_parents#{table_name_suffix}"
 
-    self.class.connection.delete("DELETE FROM #{ch} WHERE #{ch}.changeset_id IN (SELECT #{cs}.id FROM #{cs} WHERE #{cs}.repository_id = #{id})")
-    self.class.connection.delete("DELETE FROM #{ci} WHERE #{ci}.changeset_id IN (SELECT #{cs}.id FROM #{cs} WHERE #{cs}.repository_id = #{id})")
-    self.class.connection.delete("DELETE FROM #{cp} WHERE #{cp}.changeset_id IN (SELECT #{cs}.id FROM #{cs} WHERE #{cs}.repository_id = #{id})")
-    self.class.connection.delete("DELETE FROM #{cs} WHERE #{cs}.repository_id = #{id}")
+    connection.delete("DELETE FROM #{ch} WHERE #{ch}.changeset_id IN (SELECT #{cs}.id FROM #{cs} WHERE #{cs}.repository_id = #{id})")
+    connection.delete("DELETE FROM #{ci} WHERE #{ci}.changeset_id IN (SELECT #{cs}.id FROM #{cs} WHERE #{cs}.repository_id = #{id})")
+    connection.delete("DELETE FROM #{cp} WHERE #{cp}.changeset_id IN (SELECT #{cs}.id FROM #{cs} WHERE #{cs}.repository_id = #{id})")
+    connection.delete("DELETE FROM #{cs} WHERE #{cs}.repository_id = #{id}")
+    clear_extra_info_of_changesets
+  end
+
+  def clear_extra_info_of_changesets
   end
 end

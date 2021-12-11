@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,6 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 require 'active_record'
+require 'iconv' if RUBY_VERSION < '1.9'
 require 'pp'
 
 namespace :redmine do
@@ -25,12 +26,12 @@ namespace :redmine do
     module TracMigrate
         TICKET_MAP = []
 
-        new_status = IssueStatus.find_by_position(1)
+        DEFAULT_STATUS = IssueStatus.default
         assigned_status = IssueStatus.find_by_position(2)
         resolved_status = IssueStatus.find_by_position(3)
         feedback_status = IssueStatus.find_by_position(4)
         closed_status = IssueStatus.where(:is_closed => true).first
-        STATUS_MAPPING = {'new' => new_status,
+        STATUS_MAPPING = {'new' => DEFAULT_STATUS,
                           'reopened' => feedback_status,
                           'assigned' => assigned_status,
                           'closed' => closed_status
@@ -154,7 +155,7 @@ namespace :redmine do
           attachment_type = read_attribute(:type)
           #replace exotic characters with their hex representation to avoid invalid filenames
           trac_file = filename.gsub( /[^a-zA-Z0-9\-_\.!~*']/n ) do |x|
-            codepoint = x.codepoints.to_a[0]
+            codepoint = RUBY_VERSION < '1.9' ? x[0] : x.codepoints.to_a[0]
             sprintf('%%%02x', codepoint)
           end
           "#{TracMigrate.trac_attachments_directory}/#{attachment_type}/#{id}/#{trac_file}"
@@ -326,9 +327,9 @@ namespace :redmine do
         # We would like to convert the Code highlighting too
         # This will go into the next line.
         shebang_line = false
-        # Regular expression for start of code
+        # Reguar expression for start of code
         pre_re = /\{\{\{/
-        # Code highlighting...
+        # Code hightlighing...
         shebang_re = /^\#\!([a-z]+)/
         # Regular expression for end of code
         pre_end_re = /\}\}\}/
@@ -453,7 +454,7 @@ namespace :redmine do
         puts
 
         # Trac 'resolution' field as a Redmine custom field
-        r = IssueCustomField.find_by(:name => "Resolution")
+        r = IssueCustomField.where(:name => "Resolution").first
         r = IssueCustomField.new(:name => 'Resolution',
                                  :field_format => 'list',
                                  :is_filter => true) if r.nil?
@@ -476,8 +477,8 @@ namespace :redmine do
           i.author = find_or_create_user(ticket.reporter)
           i.category = issues_category_map[ticket.component] unless ticket.component.blank?
           i.fixed_version = version_map[ticket.milestone] unless ticket.milestone.blank?
+          i.status = STATUS_MAPPING[ticket.status] || DEFAULT_STATUS
           i.tracker = TRACKER_MAPPING[ticket.ticket_type] || DEFAULT_TRACKER
-          i.status = STATUS_MAPPING[ticket.status] || i.default_status
           i.id = ticket.id unless Issue.exists?(ticket.id)
           next unless Time.fake(ticket.changetime) { i.save }
           TICKET_MAP[ticket.id] = i.id
@@ -614,7 +615,7 @@ namespace :redmine do
         raise "This directory doesn't exist!" unless File.directory?(path)
         raise "#{trac_attachments_directory} doesn't exist!" unless File.directory?(trac_attachments_directory)
         @@trac_directory
-      rescue => e
+      rescue Exception => e
         puts e
         return false
       end
@@ -629,7 +630,7 @@ namespace :redmine do
         # If adapter is sqlite or sqlite3, make sure that trac.db exists
         raise "#{trac_db_path} doesn't exist!" if %w(sqlite3).include?(adapter) && !File.exist?(trac_db_path)
         @@trac_adapter = adapter
-      rescue => e
+      rescue Exception => e
         puts e
         return false
       end
@@ -714,7 +715,12 @@ namespace :redmine do
       end
 
       def self.encode(text)
-        text.to_s.force_encoding(@charset).encode('UTF-8')
+        if RUBY_VERSION < '1.9'
+          @ic ||= Iconv.new('UTF-8', @charset)
+          @ic.iconv text
+        else
+          text.to_s.force_encoding(@charset).encode('UTF-8')
+        end
       end
     end
 
@@ -775,3 +781,4 @@ namespace :redmine do
     end
   end
 end
+

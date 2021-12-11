@@ -1,4 +1,4 @@
-class AddTypeToEnumerations < ActiveRecord::Migration[4.2]
+class AddTypeToEnumerations < ActiveRecord::Migration
   def self.up
     add_column :enumerations, :type, :string
   end

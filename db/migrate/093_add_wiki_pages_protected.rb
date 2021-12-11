@@ -1,4 +1,4 @@
-class AddWikiPagesProtected < ActiveRecord::Migration[4.2]
+class AddWikiPagesProtected < ActiveRecord::Migration
   def self.up
     add_column :wiki_pages, :protected, :boolean, :default => false, :null => false
   end

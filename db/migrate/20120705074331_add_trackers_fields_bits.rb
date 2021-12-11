@@ -1,4 +1,4 @@
-class AddTrackersFieldsBits < ActiveRecord::Migration[4.2]
+class AddTrackersFieldsBits < ActiveRecord::Migration
   def self.up
     add_column :trackers, :fields_bits, :integer, :default => 0
   end

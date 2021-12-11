@@ -1,4 +1,4 @@
-class AddMissingIndexesToIssues < ActiveRecord::Migration[4.2]
+class AddMissingIndexesToIssues < ActiveRecord::Migration
   def self.up
     add_index :issues, :status_id
     add_index :issues, :category_id

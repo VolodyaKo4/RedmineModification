@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -29,15 +27,13 @@ module Redmine
           cattr_accessor :attachable_options
           self.attachable_options = {}
           attachable_options[:view_permission] = options.delete(:view_permission) || "view_#{self.name.pluralize.underscore}".to_sym
-          attachable_options[:edit_permission] = options.delete(:edit_permission) || "edit_#{self.name.pluralize.underscore}".to_sym
           attachable_options[:delete_permission] = options.delete(:delete_permission) || "edit_#{self.name.pluralize.underscore}".to_sym
 
-          has_many :attachments, lambda {order("#{Attachment.table_name}.created_on ASC, #{Attachment.table_name}.id ASC")},
-                                 **options, as: :container, dependent: :destroy, inverse_of: :container
+          has_many :attachments, options.merge(:as => :container,
+                                               :order => "#{Attachment.table_name}.created_on ASC, #{Attachment.table_name}.id ASC",
+                                               :dependent => :destroy)
           send :include, Redmine::Acts::Attachable::InstanceMethods
           before_save :attach_saved_attachments
-          after_rollback :detach_saved_attachments
-          validate :warn_about_failed_attachments
         end
       end
 
@@ -49,11 +45,6 @@ module Redmine
         def attachments_visible?(user=User.current)
           (respond_to?(:visible?) ? visible?(user) : true) &&
             user.allowed_to?(self.class.attachable_options[:view_permission], self.project)
-        end
-
-        def attachments_editable?(user=User.current)
-          (respond_to?(:visible?) ? visible?(user) : true) &&
-            user.allowed_to?(self.class.attachable_options[:edit_permission], self.project)
         end
 
         def attachments_deletable?(user=User.current)
@@ -70,10 +61,6 @@ module Redmine
         end
 
         def save_attachments(attachments, author=User.current)
-          if attachments.respond_to?(:to_unsafe_hash)
-            attachments = attachments.to_unsafe_hash
-          end
-
           if attachments.is_a?(Hash)
             attachments = attachments.stringify_keys
             attachments = attachments.to_a.sort {|a, b|
@@ -90,24 +77,21 @@ module Redmine
             attachments = attachments.map(&:last)
           end
           if attachments.is_a?(Array)
-            @failed_attachment_count = 0
             attachments.each do |attachment|
-              next unless attachment.present?
+              next unless attachment.is_a?(Hash)
               a = nil
               if file = attachment['file']
+                next unless file.size > 0
                 a = Attachment.create(:file => file, :author => author)
-              elsif token = attachment['token'].presence
+              elsif token = attachment['token']
                 a = Attachment.find_by_token(token)
-                unless a
-                  @failed_attachment_count += 1
-                  next
-                end
+                next unless a
                 a.filename = attachment['filename'] unless attachment['filename'].blank?
-                a.content_type = attachment['content_type'] unless attachment['content_type'].blank?
+                a.content_type = attachment['content_type']
               end
               next unless a
               a.description = attachment['description'].to_s.strip
-              if a.new_record? || a.invalid?
+              if a.new_record?
                 unsaved_attachments << a
               else
                 saved_attachments << a
@@ -120,20 +104,6 @@ module Redmine
         def attach_saved_attachments
           saved_attachments.each do |attachment|
             self.attachments << attachment
-          end
-        end
-
-        def detach_saved_attachments
-          saved_attachments.each do |attachment|
-            # TODO: use #reload instead, after upgrading to Rails 5
-            # (after_rollback is called when running transactional tests in Rails 4)
-            attachment.container = nil
-          end
-        end
-
-        def warn_about_failed_attachments
-          if @failed_attachment_count && @failed_attachment_count > 0
-            errors.add :base, ::I18n.t('warning_attachments_not_saved', count: @failed_attachment_count)
           end
         end
 

@@ -1,4 +1,4 @@
-class ChangeAttachmentsContainerDefaults < ActiveRecord::Migration[4.2]
+class ChangeAttachmentsContainerDefaults < ActiveRecord::Migration
   def self.up
     # Need to drop the index otherwise the following error occurs in Rails 3.1.3:
     #

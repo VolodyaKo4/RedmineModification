@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,16 +17,21 @@
 
 require File.expand_path('../../../test_helper', __FILE__)
 
-class RoutingPreviewsTest < Redmine::RoutingTest
+class RoutingPreviewsTest < ActionController::IntegrationTest
   def test_previews
-    should_route 'GET /issues/preview' => 'previews#issue'
-    should_route 'PUT /issues/preview' => 'previews#issue'
-    should_route 'POST /issues/preview' => 'previews#issue'
-
-    should_route 'GET /news/preview' => 'previews#news'
-
-    should_route 'GET /preview/text' => 'previews#text'
-    should_route 'PUT /preview/text' => 'previews#text'
-    should_route 'POST /preview/text' => 'previews#text'
+    ["get", "post", "put"].each do |method|
+      assert_routing(
+          { :method => method, :path => "/issues/preview/new/123" },
+          { :controller => 'previews', :action => 'issue', :project_id => '123' }
+        )
+      assert_routing(
+          { :method => method, :path => "/issues/preview/edit/321" },
+          { :controller => 'previews', :action => 'issue', :id => '321' }
+        )
+    end
+    assert_routing(
+        { :method => 'get', :path => "/news/preview" },
+        { :controller => 'previews', :action => 'news' }
+      )
   end
 end

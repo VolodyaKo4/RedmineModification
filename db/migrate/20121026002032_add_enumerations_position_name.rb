@@ -1,4 +1,4 @@
-class AddEnumerationsPositionName < ActiveRecord::Migration[4.2]
+class AddEnumerationsPositionName < ActiveRecord::Migration
   def up
     add_column :enumerations, :position_name, :string, :limit => 30
   end

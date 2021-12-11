@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -25,21 +23,22 @@ module Redmine
       end
 
       def link_to(name, options={})
-        url = {:format => name.to_s.downcase}.merge(options.delete(:url) || {}).except('page')
+        url = { :format => name.to_s.downcase }.merge(options.delete(:url) || {}).except('page')
         caption = options.delete(:caption) || name
-        html_options = {:class => name.to_s.downcase, :rel => 'nofollow'}.merge(options)
+        html_options = { :class => name.to_s.downcase, :rel => 'nofollow' }.merge(options)
         @view.content_tag('span', @view.link_to(caption, url, html_options))
       end
+<<<<<<< HEAD
 
-      # Preserves query parameters
-      def link_to_with_query_parameters(name, url={}, options={})
-        params = @view.request.query_parameters.except(:page, :format).except(*url.keys)
-        url = {:params => params, :page => nil, :format => name.to_s.downcase}.merge(url)
-
-        caption = options.delete(:caption) || name
-        html_options = {:class => name.to_s.downcase, :rel => 'nofollow'}.merge(options)
+      def link_to_alias(name, urlText, options={})
+        url = { :format => name.to_s.downcase }.merge(options.delete(:url) || {}).except('page')
+#        caption = options.delete(:caption) || name
+        caption = urlText
+        html_options = { :class => name.to_s.downcase, :rel => 'nofollow' }.merge(options)
         @view.content_tag('span', @view.link_to(caption, url, html_options))
       end
+=======
+>>>>>>> 248a796 (pure version 2.5.1 from http://www.redmine.org/releases/redmine-2.5.1.tar.gz)
     end
   end
 end

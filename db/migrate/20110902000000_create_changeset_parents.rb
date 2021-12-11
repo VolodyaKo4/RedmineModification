@@ -1,4 +1,4 @@
-class CreateChangesetParents < ActiveRecord::Migration[4.2]
+class CreateChangesetParents < ActiveRecord::Migration
   def self.up
     create_table :changeset_parents, :id => false do |t|
       t.column :changeset_id, :integer, :null => false

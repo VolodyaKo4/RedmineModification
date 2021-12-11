@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,11 +18,9 @@
 require File.expand_path('../../test_helper', __FILE__)
 
 class ProjectNestedSetTest < ActiveSupport::TestCase
+
   def setup
-    User.current = nil
     Project.delete_all
-    Tracker.delete_all
-    EnabledModule.delete_all
 
     @a = Project.create!(:name => 'A', :identifier => 'projecta')
     @a1 = Project.create!(:name => 'A1', :identifier => 'projecta1')
@@ -43,6 +39,8 @@ class ProjectNestedSetTest < ActiveSupport::TestCase
     @b1.set_parent!(@b)
     @b11 = Project.create!(:name => 'B11', :identifier => 'projectb11')
     @b11.set_parent!(@b1)
+
+    @a, @a1, @a2, @b, @b1, @b11, @b2, @c, @c1 = *(Project.all.sort_by(&:name))
   end
 
   def test_valid_tree
@@ -57,17 +55,12 @@ class ProjectNestedSetTest < ActiveSupport::TestCase
   end
 
   def test_rebuild_tree_should_build_valid_tree_even_with_valid_lft_rgt_values
-    Project.where({:id => @a.id}).update_all("name = 'YY'")
+    Project.where({:id => @a.id }).update_all("name = 'YY'")
     # lft and rgt values are still valid (Project.rebuild! would not update anything)
     # but projects are not ordered properly (YY is in the first place)
 
     Project.rebuild_tree!
     assert_valid_nested_set
-  end
-
-  def test_rebuild_without_projects_should_not_fail
-    Project.delete_all
-    assert Project.rebuild_tree!
   end
 
   def test_moving_a_child_to_a_different_parent_should_keep_valid_tree
@@ -169,12 +162,12 @@ class ProjectNestedSetTest < ActiveSupport::TestCase
         assert project.rgt < project.parent.rgt, "rgt=#{project.rgt} was not < parent.rgt=#{project.parent.rgt} for project #{project.name}"
       end
       # no overlapping lft/rgt values
-      overlapping = projects.detect do |other|
+      overlapping = projects.detect {|other| 
         other != project && (
           (other.lft > project.lft && other.lft < project.rgt && other.rgt > project.rgt) ||
           (other.rgt > project.lft && other.rgt < project.rgt && other.lft < project.lft)
         )
-      end
+      }
       assert_nil overlapping, (overlapping && "Project #{overlapping.name} (#{overlapping.lft}/#{overlapping.rgt}) overlapped #{project.name} (#{project.lft}/#{project.rgt})")
     end
 
@@ -183,7 +176,7 @@ class ProjectNestedSetTest < ActiveSupport::TestCase
     projects.each do |project|
       if project.children.any?
         # sibling projects sorted alphabetically
-        assert_equal project.children.map(&:name).sort, project.children.sort_by(&:lft).map(&:name), "Project #{project.name}'s children were not properly sorted"
+        assert_equal project.children.map(&:name).sort, project.children.order('lft').map(&:name), "Project #{project.name}'s children were not properly sorted"
       end
     end
   end

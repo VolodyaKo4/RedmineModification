@@ -1,7 +1,5 @@
-# frozen_string_literal: false
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -25,7 +23,7 @@ module RedminePmTest
     
     # Cannot use transactional fixtures here: database
     # will be accessed from Redmine.pm with its own connection
-    self.use_transactional_tests = false
+    self.use_transactional_fixtures = false
   
     def test_dummy
     end
@@ -67,7 +65,6 @@ module RedminePmTest
       @command = args.join(' ')
       @status = nil
       IO.popen("#{command} 2>&1") do |io|
-        io.set_encoding("ASCII-8BIT") if io.respond_to?(:set_encoding)
         @response = io.read
       end
       @status = $?.exitstatus

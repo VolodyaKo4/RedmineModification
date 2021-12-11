@@ -1,7 +1,7 @@
 == Redmine upgrade
 
 Redmine - project management software
-Copyright (C) 2006-2021  Jean-Philippe Lang
+Copyright (C) 2006-2014  Jean-Philippe Lang
 http://www.redmine.org/
 
 
@@ -44,16 +44,10 @@ http://www.redmine.org/
 
 6. Generate a session store secret
    
-   If you're upgrading from Redmine 2.x or below, remove the following file
-   if it exists: config/initializers/secret_token.rb
-
-   Then generate a new secret by running the following command under the
-   application directory:
-     bundle exec rake generate_secret_token
-
-   Alternatively, you can store this secret in config/secrets.yml:
-   http://guides.rubyonrails.org/upgrading_ruby_on_rails.html#config-secrets-yml
-
+   Redmine stores session data in cookies by default, which requires
+   a secret to be generated. Under the new application directory run:
+     rake generate_secret_token
+   
    DO NOT REPLACE OR EDIT ANY OTHER FILES.
 
 7. Migrate your database
@@ -61,18 +55,19 @@ http://www.redmine.org/
    If you are upgrading to Rails 2.3.14 as part of this migration, you
    need to upgrade the plugin migrations before running the plugin migrations
    using:
-     bundle exec rake db:migrate:upgrade_plugin_migrations RAILS_ENV="production"
+     rake db:migrate:upgrade_plugin_migrations RAILS_ENV="production"
    
    Please make a backup before doing this! Under the new application
    directory run:
-     bundle exec rake db:migrate RAILS_ENV="production"
+     rake db:migrate RAILS_ENV="production"
    
    If you have installed any plugins, you should also run their database
    migrations using:
-     bundle exec rake db:migrate_plugins RAILS_ENV="production"
+     rake db:migrate_plugins RAILS_ENV="production"
    
 8. Clear the cache and the existing sessions by running:
-     bundle exec rake tmp:cache:clear tmp:sessions:clear
+     rake tmp:cache:clear
+     rake tmp:sessions:clear
 
 9. Restart the application server (e.g. mongrel, thin, passenger)
 

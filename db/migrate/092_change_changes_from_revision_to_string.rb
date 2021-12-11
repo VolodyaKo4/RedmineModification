@@ -1,4 +1,4 @@
-class ChangeChangesFromRevisionToString < ActiveRecord::Migration[4.2]
+class ChangeChangesFromRevisionToString < ActiveRecord::Migration
   def self.up
     change_column :changes, :from_revision, :string
   end

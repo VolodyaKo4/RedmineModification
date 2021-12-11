@@ -1,7 +1,7 @@
-# frozen_string_literal: true
-
+# encoding: utf-8
+#
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,9 +19,13 @@
 
 module WatchersHelper
 
+  def watcher_tag(object, user, options={})
+    ActiveSupport::Deprecation.warn "#watcher_tag is deprecated and will be removed in Redmine 3.0. Use #watcher_link instead."
+    watcher_link(object, user)
+  end
+
   def watcher_link(objects, user)
     return '' unless user && user.logged?
-
     objects = Array.wrap(objects)
     return '' unless objects.any?
 
@@ -52,9 +56,6 @@ module WatchersHelper
       s = ''.html_safe
       s << avatar(user, :size => "16").to_s
       s << link_to_user(user, :class => 'user')
-      if object.respond_to?(:visible?) && user.is_a?(User) && !object.visible?(user)
-        s << content_tag('span', l(:notice_invalid_watcher), class: 'icon-only icon-warning', title: l(:notice_invalid_watcher))
-      end
       if remove_allowed
         url = {:controller => 'watchers',
                :action => 'destroy',
@@ -62,10 +63,8 @@ module WatchersHelper
                :object_id => object.id,
                :user_id => user}
         s << ' '
-        s << link_to(l(:button_delete), url,
-                     :remote => true, :method => 'delete',
-                     :class => "delete icon-only icon-del",
-                     :title => l(:button_delete))
+        s << link_to(image_tag('delete.png'), url,
+                     :remote => true, :method => 'delete', :class => "delete")
       end
       content << content_tag('li', s, :class => "user-#{user.id}")
     end

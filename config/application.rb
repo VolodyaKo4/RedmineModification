@@ -1,21 +1,13 @@
-# frozen_string_literal: true
-
 require File.expand_path('../boot', __FILE__)
 
-require 'rails'
-# Pick the frameworks you want:
-require 'active_model/railtie'
-require 'active_job/railtie'
-require 'active_record/railtie'
-require 'active_storage/engine'
-require 'action_controller/railtie'
-require 'action_mailer/railtie'
-require 'action_view/railtie'
-require 'action_cable/engine'
-# require 'sprockets/railtie'
-require 'rails/test_unit/railtie'
+require 'rails/all'
 
-Bundler.require(*Rails.groups)
+if defined?(Bundler)
+  # If you precompile assets before deploying to production, use this line
+  Bundler.require(*Rails.groups(:assets => %w(development test)))
+  # If you want your assets lazily compiled in production, use this line
+  # Bundler.require(:default, :assets, Rails.env)
+end
 
 module RedmineApp
   class Application < Rails::Application
@@ -41,9 +33,7 @@ module RedmineApp
     # config.i18n.load_path += Dir[Rails.root.join('my', 'locales', '*.{rb,yml}').to_s]
     # config.i18n.default_locale = :de
 
-    config.i18n.enforce_available_locales = true
-    config.i18n.fallbacks = true
-    config.i18n.default_locale = 'en'
+    I18n.enforce_available_locales = false
 
     # Configure the default encoding used in templates for Ruby 1.9.
     config.encoding = "utf-8"
@@ -51,38 +41,18 @@ module RedmineApp
     # Configure sensitive parameters which will be filtered from the log file.
     config.filter_parameters += [:password]
 
+    # Enable the asset pipeline
+    config.assets.enabled = false
+
+    # Version of your assets, change this if you want to expire all your assets
+    config.assets.version = '1.0'
+
     config.action_mailer.perform_deliveries = false
 
     # Do not include all helpers
     config.action_controller.include_all_helpers = false
 
-    # Since Redmine 4.0, boolean values are stored in sqlite3 databases as 1 and 0
-    config.active_record.sqlite3.represent_boolean_as_integer = true
-
-    # Sets the Content-Length header on responses with fixed-length bodies
-    config.middleware.insert_before Rack::Sendfile, Rack::ContentLength
-
-    # Verify validity of user sessions
-    config.redmine_verify_sessions = true
-
-    # Specific cache for search results, the default file store cache is not
-    # a good option as it could grow fast. A memory store (32MB max) is used
-    # as the default. If you're running multiple server processes, it's
-    # recommended to switch to a shared cache store (eg. mem_cache_store).
-    # See http://guides.rubyonrails.org/caching_with_rails.html#cache-stores
-    # for more options (same options as config.cache_store).
-    config.redmine_search_cache_store = :memory_store
-
-    # Configure log level here so that additional environment file
-    # can change it (environments/ENV.rb would take precedence over it)
-    config.log_level = Rails.env.production? ? :info : :debug
-
-    config.session_store(
-      :cookie_store,
-      :key => '_redmine_session',
-      :path => config.relative_url_root || '/',
-      :same_site => :lax
-    )
+    config.session_store :cookie_store, :key => '_redmine_session'
 
     if File.exists?(File.join(File.dirname(__FILE__), 'additional_environment.rb'))
       instance_eval File.read(File.join(File.dirname(__FILE__), 'additional_environment.rb'))

@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -21,11 +19,9 @@ class CustomValue < ActiveRecord::Base
   belongs_to :custom_field
   belongs_to :customized, :polymorphic => true
 
-  after_save :custom_field_after_save_custom_value
-
   def initialize(attributes=nil, *args)
     super
-    if new_record? && custom_field && !attributes.key?(:value) && (customized.nil? || customized.set_custom_field_default?(self))
+    if new_record? && custom_field && (customized_type.blank? || (customized && customized.new_record?))
       self.value ||= custom_field.default_value
     end
   end
@@ -39,18 +35,8 @@ class CustomValue < ActiveRecord::Base
     custom_field.editable?
   end
 
-  def visible?(user=User.current)
-    if custom_field.visible?
-      true
-    elsif customized.respond_to?(:project)
-      custom_field.visible_by?(customized.project, user)
-    else
-      false
-    end
-  end
-
-  def attachments_visible?(user)
-    visible?(user) && customized && customized.visible?(user)
+  def visible?
+    custom_field.visible?
   end
 
   def required?
@@ -59,11 +45,5 @@ class CustomValue < ActiveRecord::Base
 
   def to_s
     value.to_s
-  end
-
-  private
-
-  def custom_field_after_save_custom_value
-    custom_field.after_save_custom_value(self)
   end
 end

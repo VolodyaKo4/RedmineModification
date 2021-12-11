@@ -1,4 +1,4 @@
-class AddSettingsUpdatedOn < ActiveRecord::Migration[4.2]
+class AddSettingsUpdatedOn < ActiveRecord::Migration
   def self.up
     add_column :settings, :updated_on, :timestamp
     # set updated_on

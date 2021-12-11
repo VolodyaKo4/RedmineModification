@@ -1,10 +1,10 @@
-class AddCustomFieldsPosition < ActiveRecord::Migration[4.2]
+class AddCustomFieldsPosition < ActiveRecord::Migration
   def self.up
     add_column(:custom_fields, :position, :integer, :default => 1)
     CustomField.all.group_by(&:type).each  do |t, fields|
       fields.each_with_index do |field, i|
         # do not call model callbacks
-        CustomField.where({:id => field.id}).update_all(:position => (i+1))
+        CustomField.update_all "position = #{i+1}", {:id => field.id}
       end
     end
   end

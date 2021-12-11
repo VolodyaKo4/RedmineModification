@@ -1,4 +1,4 @@
-class AddCustomFieldsSearchable < ActiveRecord::Migration[4.2]
+class AddCustomFieldsSearchable < ActiveRecord::Migration
   def self.up
     add_column :custom_fields, :searchable, :boolean, :default => false
   end

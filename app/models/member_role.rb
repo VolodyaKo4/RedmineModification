@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -37,22 +35,10 @@ class MemberRole < ActiveRecord::Base
     !inherited_from.nil?
   end
 
-  # Returns the MemberRole from which self was inherited, or nil
-  def inherited_from_member_role
-    MemberRole.find_by_id(inherited_from) if inherited_from
-  end
-
-  # Destroys the MemberRole without destroying its Member if it doesn't have
-  # any other roles
-  def destroy_without_member_removal
-    @member_removal = false
-    destroy
-  end
-
   private
 
   def remove_member_if_empty
-    if @member_removal != false && member.roles.empty?
+    if member.roles.empty?
       member.destroy
     end
   end
@@ -78,6 +64,9 @@ class MemberRole < ActiveRecord::Base
   end
 
   def remove_inherited_roles
-    MemberRole.where(:inherited_from => id).destroy_all
+    MemberRole.where(:inherited_from => id).group_by(&:member).
+        each do |member, member_roles|
+      member_roles.each(&:destroy)
+    end
   end
 end

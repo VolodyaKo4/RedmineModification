@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 # The Greeter class
 class Greeter
   def initialize(name)

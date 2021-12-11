@@ -1,4 +1,4 @@
-class AddQueriesColumnNames < ActiveRecord::Migration[4.2]
+class AddQueriesColumnNames < ActiveRecord::Migration
   def self.up
     add_column :queries, :column_names, :text
   end

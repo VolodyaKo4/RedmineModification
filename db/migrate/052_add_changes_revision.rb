@@ -1,4 +1,4 @@
-class AddChangesRevision < ActiveRecord::Migration[4.2]
+class AddChangesRevision < ActiveRecord::Migration
   def self.up
     add_column :changes, :revision, :string
   end

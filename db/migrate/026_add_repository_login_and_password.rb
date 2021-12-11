@@ -1,4 +1,4 @@
-class AddRepositoryLoginAndPassword < ActiveRecord::Migration[4.2]
+class AddRepositoryLoginAndPassword < ActiveRecord::Migration
   def self.up
     add_column :repositories, :login, :string, :limit => 60, :default => ""
     add_column :repositories, :password, :string, :limit => 60, :default => ""

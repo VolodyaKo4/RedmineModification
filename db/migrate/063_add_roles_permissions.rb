@@ -1,4 +1,4 @@
-class AddRolesPermissions < ActiveRecord::Migration[4.2]
+class AddRolesPermissions < ActiveRecord::Migration
   def self.up
     add_column :roles, :permissions, :text
   end

@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,7 +17,7 @@
 
 require File.expand_path('../../test_helper', __FILE__)
 
-class LayoutTest < Redmine::IntegrationTest
+class LayoutTest < ActionController::IntegrationTest
   fixtures :projects, :trackers, :issue_statuses, :issues,
            :enumerations, :users, :issue_categories,
            :projects_trackers,
@@ -38,7 +36,9 @@ class LayoutTest < Redmine::IntegrationTest
   end
 
   test "browsing to an unauthorized page should render the base layout" do
-    log_user('jsmith','jsmith')
+    change_user_password('miscuser9', 'test1234')
+
+    log_user('miscuser9','test1234')
 
     get "/admin"
     assert_response :forbidden
@@ -65,66 +65,55 @@ class LayoutTest < Redmine::IntegrationTest
     Role.anonymous.add_permission! :add_issues
 
     get '/projects/ecookbook/issues/new'
-    assert_select 'head script[src^=?]', '/javascripts/jstoolbar/jstoolbar.js?'
-    assert_include "var userHlLanguages = #{UserPreference::DEFAULT_TOOLBAR_LANGUAGE_OPTIONS.to_json};", response.body
+    assert_tag :script,
+      :attributes => {:src => %r{^/javascripts/jstoolbar/jstoolbar-textile.min.js}},
+      :parent => {:tag => 'head'}
   end
 
   def test_calendar_header_tags
     with_settings :default_language => 'fr' do
       get '/issues'
-      assert_include "/javascripts/i18n/datepicker-fr.js", response.body
+      assert_include "/javascripts/i18n/jquery.ui.datepicker-fr.js", response.body
     end
 
     with_settings :default_language => 'en-GB' do
       get '/issues'
-      assert_include "/javascripts/i18n/datepicker-en-GB.js", response.body
+      assert_include "/javascripts/i18n/jquery.ui.datepicker-en-GB.js", response.body
     end
 
     with_settings :default_language => 'en' do
       get '/issues'
-      assert_not_include "/javascripts/i18n/datepicker", response.body
-    end
-
-    with_settings :default_language => 'es' do
-      get '/issues'
-      assert_include "/javascripts/i18n/datepicker-es.js", response.body
-    end
-
-    with_settings :default_language => 'es-PA' do
-      get '/issues'
-      # There is not datepicker-es-PA.js
-      # https://github.com/jquery/jquery-ui/tree/1.11.4/ui/i18n
-      assert_not_include "/javascripts/i18n/datepicker-es.js", response.body
+      assert_not_include "/javascripts/i18n/jquery.ui.datepicker", response.body
     end
 
     with_settings :default_language => 'zh' do
       get '/issues'
-      assert_include "/javascripts/i18n/datepicker-zh-CN.js", response.body
+      assert_include "/javascripts/i18n/jquery.ui.datepicker-zh-CN.js", response.body
     end
 
     with_settings :default_language => 'zh-TW' do
       get '/issues'
-      assert_include "/javascripts/i18n/datepicker-zh-TW.js", response.body
+      assert_include "/javascripts/i18n/jquery.ui.datepicker-zh-TW.js", response.body
     end
 
     with_settings :default_language => 'pt' do
       get '/issues'
-      assert_include "/javascripts/i18n/datepicker-pt.js", response.body
+      assert_include "/javascripts/i18n/jquery.ui.datepicker-pt.js", response.body
     end
 
     with_settings :default_language => 'pt-BR' do
       get '/issues'
-      assert_include "/javascripts/i18n/datepicker-pt-BR.js", response.body
+      assert_include "/javascripts/i18n/jquery.ui.datepicker-pt-BR.js", response.body
     end
   end
 
   def test_search_field_outside_project_should_link_to_global_search
     get '/'
-    assert_select 'div#quick-search form[action="/search"]'
+    assert_select 'div#quick-search form[action=/search]'
   end
 
   def test_search_field_inside_project_should_link_to_project_search
     get '/projects/ecookbook'
-    assert_select 'div#quick-search form[action="/projects/ecookbook/search"]'
+    assert_select 'div#quick-search form[action=/projects/ecookbook/search]'
   end
 end

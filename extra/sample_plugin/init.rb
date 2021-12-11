@@ -1,4 +1,4 @@
-Rails.logger.info 'Starting Example plugin for Redmine'
+Rails.logger.info 'Starting Example plugin for RedMine'
 
 Redmine::Plugin.register :sample_plugin do
   name 'Example plugin'

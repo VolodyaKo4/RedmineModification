@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,10 +17,19 @@
 
 require File.expand_path('../../../test_helper', __FILE__)
 
-class RoutingFilesTest < Redmine::RoutingTest
+class RoutingFilesTest < ActionController::IntegrationTest
   def test_files
-    should_route 'GET /projects/foo/files' => 'files#index', :project_id => 'foo'
-    should_route 'GET /projects/foo/files/new' => 'files#new', :project_id => 'foo'
-    should_route 'POST /projects/foo/files' => 'files#create', :project_id => 'foo'
+    assert_routing(
+        { :method => 'get', :path => "/projects/33/files" },
+        { :controller => 'files', :action => 'index', :project_id => '33' }
+      )
+    assert_routing(
+        { :method => 'get', :path => "/projects/33/files/new" },
+        { :controller => 'files', :action => 'new', :project_id => '33' }
+      )
+    assert_routing(
+        { :method => 'post', :path => "/projects/33/files" },
+        { :controller => 'files', :action => 'create', :project_id => '33' }
+      )
   end
 end

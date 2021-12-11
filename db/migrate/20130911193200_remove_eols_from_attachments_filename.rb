@@ -1,4 +1,4 @@
-class RemoveEolsFromAttachmentsFilename < ActiveRecord::Migration[4.2]
+class RemoveEolsFromAttachmentsFilename < ActiveRecord::Migration
   def up
     Attachment.where("filename like ? or filename like ?", "%\r%", "%\n%").each do |attachment|
       filename = attachment.filename.to_s.tr("\r\n", "_")

@@ -1,4 +1,4 @@
-class AddMissingIndexesToComments < ActiveRecord::Migration[4.2]
+class AddMissingIndexesToComments < ActiveRecord::Migration
   def self.up
     add_index :comments, [:commented_id, :commented_type]
     add_index :comments, :author_id

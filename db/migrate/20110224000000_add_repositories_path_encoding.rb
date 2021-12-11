@@ -1,4 +1,4 @@
-class AddRepositoriesPathEncoding < ActiveRecord::Migration[4.2]
+class AddRepositoriesPathEncoding < ActiveRecord::Migration
   def self.up
     add_column :repositories, :path_encoding, :string, :limit => 64, :default => nil
   end

@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -31,7 +29,7 @@ module Redmine
             send :include, Redmine::Acts::ActivityProvider::InstanceMethods
           end
 
-          options.assert_valid_keys(:type, :permission, :timestamp, :author_key, :scope)
+          options.assert_valid_keys(:type, :permission, :timestamp, :author_key, :find_options)
           self.activity_provider_options ||= {}
 
           # One model can provide different event types
@@ -39,6 +37,7 @@ module Redmine
           event_type = options.delete(:type) || self.name.underscore.pluralize
 
           options[:timestamp] ||= "#{table_name}.created_on"
+          options[:find_options] ||= {}
           options[:author_key] = "#{table_name}.#{options[:author_key]}" if options[:author_key].is_a?(Symbol)
           self.activity_provider_options[event_type] = options
         end
@@ -50,19 +49,12 @@ module Redmine
         end
 
         module ClassMethods
-          # Returns events of type event_type visible by user that occurred between from and to
+          # Returns events of type event_type visible by user that occured between from and to
           def find_events(event_type, user, from, to, options)
             provider_options = activity_provider_options[event_type]
             raise "#{self.name} can not provide #{event_type} events." if provider_options.nil?
 
-            scope = provider_options[:scope]
-            if !scope
-              scope = self
-            elsif scope.respond_to?(:call)
-              scope = scope.call
-            else
-              ActiveSupport::Deprecation.warn "acts_as_activity_provider with implicit :scope option is deprecated. Please pass a scope on the #{self.name} as a proc."
-            end
+            scope = self
 
             if from && to
               scope = scope.where("#{provider_options[:timestamp]} BETWEEN ? AND ?", from, to)
@@ -87,7 +79,7 @@ module Redmine
               scope = scope.where(Project.allowed_to_condition(user, "view_#{self.name.underscore.pluralize}".to_sym, options))
             end
 
-            scope.to_a
+            scope.all(provider_options[:find_options].dup)
           end
         end
       end

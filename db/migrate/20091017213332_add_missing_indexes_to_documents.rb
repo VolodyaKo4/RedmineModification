@@ -1,4 +1,4 @@
-class AddMissingIndexesToDocuments < ActiveRecord::Migration[4.2]
+class AddMissingIndexesToDocuments < ActiveRecord::Migration
   def self.up
     add_index :documents, :category_id
   end

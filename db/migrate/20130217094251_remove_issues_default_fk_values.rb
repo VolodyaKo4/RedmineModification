@@ -1,4 +1,4 @@
-class RemoveIssuesDefaultFkValues < ActiveRecord::Migration[4.2]
+class RemoveIssuesDefaultFkValues < ActiveRecord::Migration
   def up
     change_column_default :issues, :tracker_id, nil
     change_column_default :issues, :project_id, nil

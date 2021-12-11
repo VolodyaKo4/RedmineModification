@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -26,15 +24,9 @@ module Redmine
           Redmine::WikiFormatting::Macros.available_macros.key?(name.to_sym)
         end
 
-        def exec_macro(name, obj, args, text, options={})
+        def exec_macro(name, obj, args, text)
           macro_options = Redmine::WikiFormatting::Macros.available_macros[name.to_sym]
           return unless macro_options
-
-          if options[:inline_attachments] == false
-            Redmine::WikiFormatting::Macros.inline_attachments = false
-          else
-            Redmine::WikiFormatting::Macros.inline_attachments = true
-          end
 
           method_name = "macro_#{name}"
           unless macro_options[:parse_args] == false
@@ -45,12 +37,12 @@ module Redmine
             if self.class.instance_method(method_name).arity == 3
               send(method_name, obj, args, text)
             elsif text
-              raise t(:error_macro_does_not_accept_block)
+              raise "This macro does not accept a block of text"
             else
               send(method_name, obj, args)
             end
           rescue => e
-            %|<div class="flash error">#{t(:error_can_not_execute_macro_html, :name => name, :error => e.to_s)}</div>|.html_safe
+            "<div class=\"flash error\">Error executing the <strong>#{h name}</strong> macro (#{h e.to_s})</div>".html_safe
           end
         end
 
@@ -65,9 +57,7 @@ module Redmine
       end
 
       @@available_macros = {}
-      @@inline_attachments = true
       mattr_accessor :available_macros
-      mattr_accessor :inline_attachments
 
       class << self
         # Plugins can use this method to define new macros:
@@ -77,7 +67,7 @@ module Redmine
         #     macro :my_macro do |obj, args|
         #       "My macro output"
         #     end
-        #
+        #   
         #     desc "This is my macro that accepts a block of text"
         #     macro :my_macro do |obj, args, text|
         #       "My macro output"
@@ -91,7 +81,7 @@ module Redmine
         #
         # Options:
         # * :desc - A description of the macro
-        # * :parse_args => false - Disables arguments parsing (the whole arguments
+        # * :parse_args => false - Disables arguments parsing (the whole arguments 
         #   string is passed to the macro)
         #
         # Macro blocks accept 2 or 3 arguments:
@@ -99,10 +89,10 @@ module Redmine
         # * args: macro arguments
         # * text: the block of text given to the macro (should be present only if the
         #   macro accepts a block of text). text is a String or nil if the macro is
-        #   invoked without a block of text.
+        #   invoked without a block of text.  
         #
         # Examples:
-        # By default, when the macro is invoked, the comma separated list of arguments
+        # By default, when the macro is invoked, the coma separated list of arguments
         # is split and passed to the macro block as an array. If no argument is given
         # the macro will be invoked with an empty array:
         #
@@ -151,13 +141,12 @@ module Redmine
         # If a block of text is given, the closing tag }} must be at the start of a new line.
         def macro(name, options={}, &block)
           options.assert_valid_keys(:desc, :parse_args)
-          unless /\A\w+\z/.match?(name.to_s)
+          unless name.to_s.match(/\A\w+\z/)
             raise "Invalid macro name: #{name} (only 0-9, A-Z, a-z and _ characters are accepted)"
           end
           unless block_given?
             raise "Can not create a macro without a block!"
           end
-
           name = name.to_s.downcase.to_sym
           available_macros[name] = {:desc => @@desc || ''}.merge(options)
           @@desc = nil
@@ -173,8 +162,7 @@ module Redmine
       # Builtin macros
       desc "Sample macro."
       macro :hello_world do |obj, args, text|
-        h(
-          "Hello world! Object: #{obj.class.name}, " +
+        h("Hello world! Object: #{obj.class.name}, " + 
           (args.empty? ? "Called with no argument" : "Arguments: #{args.join(', ')}") +
           " and " + (text.present? ? "a #{text.size} bytes long block of text." : "no block of text.")
         )
@@ -185,16 +173,16 @@ module Redmine
         out = ''.html_safe
         @@available_macros.each do |macro, options|
           out << content_tag('dt', content_tag('code', macro.to_s))
-          out << content_tag('dd', content_tag('pre', options[:desc]))
+          out << content_tag('dd', textilizable(options[:desc]))
         end
         content_tag('dl', out)
       end
 
       desc "Displays a list of child pages. With no argument, it displays the child pages of the current wiki page. Examples:\n\n" +
-             "{{child_pages}} -- can be used from a wiki page only\n" +
-             "{{child_pages(depth=2)}} -- display 2 levels nesting only\n" +
-             "{{child_pages(Foo)}} -- lists all children of page Foo\n" +
-             "{{child_pages(Foo, parent=1)}} -- same as above with a link to page Foo"
+             "  !{{child_pages}} -- can be used from a wiki page only\n" +
+             "  !{{child_pages(depth=2)}} -- display 2 levels nesting only\n"
+             "  !{{child_pages(Foo)}} -- lists all children of page Foo\n" +
+             "  !{{child_pages(Foo, parent=1)}} -- same as above with a link to page Foo"
       macro :child_pages do |obj, args|
         args, options = extract_macro_options(args, :parent, :depth)
         options[:depth] = options[:depth].to_i if options[:depth].present?
@@ -205,119 +193,53 @@ module Redmine
         elsif obj.is_a?(WikiContent) || obj.is_a?(WikiContent::Version)
           page = obj.page
         else
-          raise t(:error_childpages_macro_no_argument)
+          raise 'With no argument, this macro can be called from wiki pages only.'
         end
-        raise t(:error_page_not_found) if page.nil? || !User.current.allowed_to?(:view_wiki_pages, page.wiki.project)
-
+        raise 'Page not found' if page.nil? || !User.current.allowed_to?(:view_wiki_pages, page.wiki.project)
         pages = page.self_and_descendants(options[:depth]).group_by(&:parent_id)
         render_page_hierarchy(pages, options[:parent] ? page.parent_id : page.id)
       end
 
-      desc "Includes a wiki page. Examples:\n\n" +
-             "{{include(Foo)}}\n" +
-             "{{include(projectname:Foo)}} -- to include a page of a specific project wiki"
+      desc "Include a wiki page. Example:\n\n  !{{include(Foo)}}\n\nor to include a page of a specific project wiki:\n\n  !{{include(projectname:Foo)}}"
       macro :include do |obj, args|
         page = Wiki.find_page(args.first.to_s, :project => @project)
-        raise t(:error_page_not_found) if page.nil? || !User.current.allowed_to?(:view_wiki_pages, page.wiki.project)
-
+        raise 'Page not found' if page.nil? || !User.current.allowed_to?(:view_wiki_pages, page.wiki.project)
         @included_wiki_pages ||= []
-        raise t(:error_circular_inclusion) if @included_wiki_pages.include?(page.id)
-
-        @included_wiki_pages << page.id
-        out =
-          textilizable(
-            page.content,
-            :text,
-            :attachments => page.attachments,
-            :headings => false,
-            :inline_attachments => @@inline_attachments
-          )
+        raise 'Circular inclusion detected' if @included_wiki_pages.include?(page.title)
+        @included_wiki_pages << page.title
+        out = textilizable(page.content, :text, :attachments => page.attachments, :headings => false)
         @included_wiki_pages.pop
         out
       end
 
-      desc "Inserts of collapsed block of text. Examples:\n\n" +
-             "{{collapse\nThis is a block of text that is collapsed by default.\nIt can be expanded by clicking a link.\n}}\n\n" +
-             "{{collapse(View details...)\nWith custom link text.\n}}"
+      desc "Inserts of collapsed block of text. Example:\n\n  {{collapse(View details...)\nThis is a block of text that is collapsed by default.\nIt can be expanded by clicking a link.\n}}"
       macro :collapse do |obj, args, text|
         html_id = "collapse-#{Redmine::Utils.random_hex(4)}"
         show_label = args[0] || l(:button_show)
         hide_label = args[1] || args[0] || l(:button_hide)
         js = "$('##{html_id}-show, ##{html_id}-hide').toggle(); $('##{html_id}').fadeToggle(150);"
         out = ''.html_safe
-        out << link_to_function(show_label, js, :id => "#{html_id}-show", :class => 'icon icon-collapsed collapsible')
-        out <<
-          link_to_function(
-            hide_label, js,
-            :id => "#{html_id}-hide",
-            :class => 'icon icon-expended collapsible',
-            :style => 'display:none;'
-          )
-        out <<
-          content_tag(
-            'div',
-            textilizable(text, :object => obj, :headings => false,
-                         :inline_attachments => @@inline_attachments),
-            :id => html_id, :class => 'collapsed-text',
-            :style => 'display:none;'
-          )
+        out << link_to_function(show_label, js, :id => "#{html_id}-show", :class => 'collapsible collapsed')
+        out << link_to_function(hide_label, js, :id => "#{html_id}-hide", :class => 'collapsible', :style => 'display:none;')
+        out << content_tag('div', textilizable(text, :object => obj, :headings => false), :id => html_id, :class => 'collapsed-text', :style => 'display:none;')
         out
       end
 
-      desc "Displays a clickable thumbnail of an attached image.\n" +
-             "Default size is 200 pixels. Examples:\n\n" +
-             "{{thumbnail(image.png)}}\n" +
-             "{{thumbnail(image.png, size=300, title=Thumbnail)}} -- with custom title and size"
+      desc "Displays a clickable thumbnail of an attached image. Examples:\n\n<pre>{{thumbnail(image.png)}}\n{{thumbnail(image.png, size=300, title=Thumbnail)}}</pre>"
       macro :thumbnail do |obj, args|
         args, options = extract_macro_options(args, :size, :title)
         filename = args.first
-        raise t(:error_filename_required) unless filename.present?
-
+        raise 'Filename required' unless filename.present?
         size = options[:size]
-        raise t(:error_invalid_size_parameter) unless size.nil? || /^\d+$/.match?(size)
-
+        raise 'Invalid size parameter' unless size.nil? || size.match(/^\d+$/)
         size = size.to_i
-        size = 200 unless size > 0
-        if obj && obj.respond_to?(:attachments) &&
-             attachment = Attachment.latest_attach(obj.attachments, filename)
+        size = nil unless size > 0
+        if obj && obj.respond_to?(:attachments) && attachment = Attachment.latest_attach(obj.attachments, filename)
           title = options[:title] || attachment.title
-          thumbnail_url =
-            url_for(:controller => 'attachments', :action => 'thumbnail',
-                    :id => attachment, :size => size, :only_path => @only_path)
-          image_url =
-            url_for(:controller => 'attachments', :action => 'show',
-                    :id => attachment, :only_path => @only_path)
-          img = image_tag(thumbnail_url, :alt => attachment.filename)
-          link_to(img, image_url, :class => 'thumbnail', :title => title)
+          img = image_tag(url_for(:controller => 'attachments', :action => 'thumbnail', :id => attachment, :size => size), :alt => attachment.filename)
+          link_to(img, url_for(:controller => 'attachments', :action => 'show', :id => attachment), :class => 'thumbnail', :title => title)
         else
-          raise t(:error_attachment_not_found, :name => filename)
-        end
-      end
-
-      desc "Displays an issue link including additional information. Examples:\n\n" +
-             "{{issue(123)}}                              -- Issue #123: Enhance macro capabilities\n" +
-             "{{issue(123, project=true)}}                -- Andromeda - Issue #123: Enhance macro capabilities\n" +
-             "{{issue(123, tracker=false)}}               -- #123: Enhance macro capabilities\n" +
-             "{{issue(123, subject=false, project=true)}} -- Andromeda - Issue #123\n"
-      macro :issue do |obj, args|
-        args, options = extract_macro_options(args, :project, :subject, :tracker)
-        id = args.first
-        issue = Issue.visible.find_by(id: id)
-
-        if issue
-          # remove invalid options
-          options.delete_if {|k, v| v != 'true' && v != 'false'}
-
-          # turn string values into boolean
-          options.each do |k, v|
-            options[k] = v == 'true'
-          end
-
-          link_to_issue(issue, options)
-        else
-          # Fall back to regular issue link format to indicate, that there
-          # should have been something.
-          "##{id}"
+          raise "Attachment #{filename} not found"
         end
       end
     end

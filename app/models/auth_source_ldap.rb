@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -22,30 +20,15 @@ require 'net/ldap/dn'
 require 'timeout'
 
 class AuthSourceLdap < AuthSource
-  NETWORK_EXCEPTIONS = [
-    Net::LDAP::Error,
-    Errno::ECONNABORTED, Errno::ECONNREFUSED, Errno::ECONNRESET,
-    Errno::EHOSTDOWN, Errno::EHOSTUNREACH,
-    SocketError
-  ]
-
   validates_presence_of :host, :port, :attr_login
   validates_length_of :name, :host, :maximum => 60, :allow_nil => true
-  validates_length_of :account, :account_password, :base_dn, :maximum => 255, :allow_blank => true
+  validates_length_of :account, :account_password, :base_dn, :filter, :maximum => 255, :allow_blank => true
   validates_length_of :attr_login, :attr_firstname, :attr_lastname, :attr_mail, :maximum => 30, :allow_nil => true
   validates_numericality_of :port, :only_integer => true
   validates_numericality_of :timeout, :only_integer => true, :allow_blank => true
   validate :validate_filter
 
   before_validation :strip_ldap_attributes
-
-  safe_attributes 'ldap_mode'
-
-  LDAP_MODES = [
-    :ldap,
-    :ldaps_verify_none,
-    :ldaps_verify_peer
-  ]
 
   def initialize(attributes=nil, *args)
     super
@@ -62,21 +45,17 @@ class AuthSourceLdap < AuthSource
         return attrs.except(:dn)
       end
     end
-  rescue *NETWORK_EXCEPTIONS => e
+  rescue Net::LDAP::LdapError => e
     raise AuthSourceException.new(e.message)
   end
 
-  # Test the connection to the LDAP
+  # test the connection to the LDAP
   def test_connection
     with_timeout do
       ldap_con = initialize_ldap_con(self.account, self.account_password)
-      ldap_con.open {}
-      if self.account.present? && !self.account.include?("$login") && self.account_password.present?
-        ldap_auth = authenticate_dn(self.account, self.account_password)
-        raise AuthSourceException.new(l(:error_ldap_bind_credentials)) if !ldap_auth
-      end
+      ldap_con.open { }
     end
-  rescue *NETWORK_EXCEPTIONS => e
+  rescue Net::LDAP::LdapError => e
     raise AuthSourceException.new(e.message)
   end
 
@@ -106,33 +85,8 @@ class AuthSourceLdap < AuthSource
       results << attrs
     end
     results
-  rescue *NETWORK_EXCEPTIONS => e
+  rescue Net::LDAP::LdapError => e
     raise AuthSourceException.new(e.message)
-  end
-
-  def ldap_mode
-    case
-    when tls && verify_peer
-      :ldaps_verify_peer
-    when tls && !verify_peer
-      :ldaps_verify_none
-    else
-      :ldap
-    end
-  end
-
-  def ldap_mode=(ldap_mode)
-    case ldap_mode.try(:to_sym)
-    when :ldaps_verify_peer
-      self.tls = true
-      self.verify_peer = true
-    when :ldaps_verify_none
-      self.tls = true
-      self.verify_peer = false
-    else
-      self.tls = false
-      self.verify_peer = false
-    end
   end
 
   private
@@ -151,7 +105,7 @@ class AuthSourceLdap < AuthSource
     if filter.present?
       Net::LDAP::Filter.construct(filter)
     end
-  rescue Net::LDAP::Error, Net::LDAP::FilterSyntaxInvalidError
+  rescue Net::LDAP::LdapError
     nil
   end
 
@@ -176,29 +130,21 @@ class AuthSourceLdap < AuthSource
   end
 
   def initialize_ldap_con(ldap_user, ldap_password)
-    options = {:host => self.host, :port => self.port}
-    if tls
-      options[:encryption] = {
-        :method => :simple_tls,
-        # Always provide non-empty tls_options, to make sure, that all
-        # OpenSSL::SSL::SSLContext::DEFAULT_PARAMS as well as the default cert
-        # store are used.
-        :tls_options => {:verify_mode => verify_peer? ? OpenSSL::SSL::VERIFY_PEER : OpenSSL::SSL::VERIFY_NONE}
-      }
-    end
-    unless ldap_user.blank? && ldap_password.blank?
-      options[:auth] = {:method => :simple, :username => ldap_user, :password => ldap_password}
-    end
+    options = { :host => self.host,
+                :port => self.port,
+                :encryption => (self.tls ? :simple_tls : nil)
+              }
+    options.merge!(:auth => { :method => :simple, :username => ldap_user, :password => ldap_password }) unless ldap_user.blank? && ldap_password.blank?
     Net::LDAP.new options
   end
 
   def get_user_attributes_from_ldap_entry(entry)
     {
-      :dn => entry.dn,
-      :firstname => AuthSourceLdap.get_attr(entry, self.attr_firstname),
-      :lastname => AuthSourceLdap.get_attr(entry, self.attr_lastname),
-      :mail => AuthSourceLdap.get_attr(entry, self.attr_mail),
-      :auth_source_id => self.id
+     :dn => entry.dn,
+     :firstname => AuthSourceLdap.get_attr(entry, self.attr_firstname),
+     :lastname => AuthSourceLdap.get_attr(entry, self.attr_lastname),
+     :mail => AuthSourceLdap.get_attr(entry, self.attr_mail),
+     :auth_source_id => self.id
     }
   end
 
@@ -229,26 +175,26 @@ class AuthSourceLdap < AuthSource
     end
     attrs = {}
     search_filter = base_filter & Net::LDAP::Filter.eq(self.attr_login, login)
+
     ldap_con.search( :base => self.base_dn,
                      :filter => search_filter,
                      :attributes=> search_attributes) do |entry|
+
       if onthefly_register?
         attrs = get_user_attributes_from_ldap_entry(entry)
       else
         attrs = {:dn => entry.dn}
       end
+
       logger.debug "DN found for #{login}: #{attrs[:dn]}" if logger && logger.debug?
     end
+
     attrs
   end
 
-  # Singleton class method is public
-  class << self
-    def get_attr(entry, attr_name)
-      if !attr_name.blank?
-        value = entry[attr_name].is_a?(Array) ? entry[attr_name].first : entry[attr_name]
-        (+value.to_s).force_encoding('UTF-8')
-      end
+  def self.get_attr(entry, attr_name)
+    if !attr_name.blank?
+      entry[attr_name].is_a?(Array) ? entry[attr_name].first : entry[attr_name]
     end
   end
 end

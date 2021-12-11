@@ -1,4 +1,4 @@
-class AddMembersMailNotification < ActiveRecord::Migration[4.2]
+class AddMembersMailNotification < ActiveRecord::Migration
   def self.up
     add_column :members, :mail_notification, :boolean, :default => false, :null => false
   end

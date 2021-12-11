@@ -15,9 +15,12 @@ Content-Transfer-Encoding: 7bit
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
 <head>
-<style>p {font-size:12.0pt;}</style>
 </head>
 <body bgcolor="#ffffff" text="#000000">
+<<<<<<< HEAD
 This is a <b>html-only</b> email.<br><h1>With a title</h1><p>and a paragraph.</p>
+=======
+This is a <b>html-only</b> email.<br>
+>>>>>>> 248a796 (pure version 2.5.1 from http://www.redmine.org/releases/redmine-2.5.1.tar.gz)
 </body>
 </html>

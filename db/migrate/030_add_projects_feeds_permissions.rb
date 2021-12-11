@@ -1,4 +1,4 @@
-class AddProjectsFeedsPermissions < ActiveRecord::Migration[4.2]
+class AddProjectsFeedsPermissions < ActiveRecord::Migration
   # model removed
   class Permission < ActiveRecord::Base; end
 

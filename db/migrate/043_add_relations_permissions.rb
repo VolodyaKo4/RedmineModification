@@ -1,4 +1,4 @@
-class AddRelationsPermissions < ActiveRecord::Migration[4.2]
+class AddRelationsPermissions < ActiveRecord::Migration
   # model removed
   class Permission < ActiveRecord::Base; end
 

@@ -1,4 +1,4 @@
-class AddAttachmentsDiskDirectory < ActiveRecord::Migration[4.2]
+class AddAttachmentsDiskDirectory < ActiveRecord::Migration
   def up
     add_column :attachments, :disk_directory, :string
   end

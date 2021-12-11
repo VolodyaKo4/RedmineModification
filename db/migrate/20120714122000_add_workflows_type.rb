@@ -1,4 +1,4 @@
-class AddWorkflowsType < ActiveRecord::Migration[4.2]
+class AddWorkflowsType < ActiveRecord::Migration
   def up
     add_column :workflows, :type, :string, :limit => 30
   end

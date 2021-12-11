@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,15 +17,11 @@
 
 module Redmine
   module MenuManager
-    # @private
-    class MenuError < StandardError
+    class MenuError < StandardError #:nodoc:
     end
 
     module MenuController
       def self.included(base)
-        base.class_attribute :main_menu
-        base.main_menu = true
-
         base.extend(ClassMethods)
       end
 
@@ -57,35 +51,18 @@ module Redmine
         self.class.menu_items
       end
 
-      def current_menu(project)
-        if project && !project.new_record?
-          :project_menu
-        elsif self.class.main_menu
-          :application_menu
-        end
-      end
-
       # Returns the menu item name according to the current action
       def current_menu_item
         @current_menu_item ||= menu_items[controller_name.to_sym][:actions][action_name.to_sym] ||
                                  menu_items[controller_name.to_sym][:default]
       end
 
-      # Redirects user to the menu item
-      # Returns false if user is not authorized
-      def redirect_to_menu_item(name)
-        redirect_to_project_menu_item(nil, name)
-      end
-
       # Redirects user to the menu item of the given project
       # Returns false if user is not authorized
       def redirect_to_project_menu_item(project, name)
-        menu = project.nil? ? :application_menu : :project_menu
-        item = Redmine::MenuManager.items(menu).detect {|i| i.name.to_s == name.to_s}
-        if item && item.allowed?(User.current, project)
-          url = item.url
-          url = {item.param => project}.merge(url) if project
-          redirect_to url
+        item = Redmine::MenuManager.items(:project_menu).detect {|i| i.name.to_s == name.to_s}
+        if item && User.current.allowed_to?(item.url, project) && (item.condition.nil? || item.condition.call(project))
+          redirect_to({item.param => project}.merge(item.url))
           return true
         end
         false
@@ -100,14 +77,12 @@ module Redmine
 
       # Renders the application main menu
       def render_main_menu(project)
-        if menu_name = controller.current_menu(project)
-          render_menu(menu_name, project)
-        end
+        render_menu((project && !project.new_record?) ? :project_menu : :application_menu, project)
       end
 
       def display_main_menu?(project)
-        menu_name = controller.current_menu(project)
-        menu_name.present? && Redmine::MenuManager.items(menu_name).children.present?
+        menu_name = project && !project.new_record? ? :project_menu : :application_menu
+        Redmine::MenuManager.items(menu_name).children.present?
       end
 
       def render_menu(menu, project=nil)
@@ -115,7 +90,7 @@ module Redmine
         menu_items_for(menu, project) do |node|
           links << render_menu_node(node, project)
         end
-        links.empty? ? nil : content_tag('ul', links.join.html_safe)
+        links.empty? ? nil : content_tag('ul', links.join("\n").html_safe)
       end
 
       def render_menu_node(node, project=nil)
@@ -124,7 +99,7 @@ module Redmine
         else
           caption, url, selected = extract_node_details(node, project)
           return content_tag('li',
-                             render_single_menu_node(node, caption, url, selected))
+                               render_single_menu_node(node, caption, url, selected))
         end
       end
 
@@ -139,7 +114,7 @@ module Redmine
           # Standard children
           standard_children_list = "".html_safe.tap do |child_html|
             node.children.each do |child|
-              child_html << render_menu_node(child, project) if allowed_node?(child, User.current, project)
+              child_html << render_menu_node(child, project)
             end
           end
 
@@ -163,7 +138,7 @@ module Redmine
           # Tree nodes support #each so we need to do object detection
           if unattached_children.is_a? Array
             unattached_children.each do |child|
-              child_html << content_tag(:li, render_unattached_menu_item(child, project)) if allowed_node?(child, User.current, project)
+              child_html << content_tag(:li, render_unattached_menu_item(child, project))
             end
           else
             raise MenuError, ":child_menus must be an array of MenuItems"
@@ -172,29 +147,23 @@ module Redmine
       end
 
       def render_single_menu_node(item, caption, url, selected)
-        options = item.html_options(:selected => selected)
-
-        # virtual nodes are only there for their children to be displayed in the menu
-        # and should not do anything on click, except if otherwise defined elsewhere
-        if url.blank?
-          url = '#'
-          options.reverse_merge!(:onclick => 'return false;')
-        end
-        link_to(h(caption), url, options)
+        link_to(h(caption), url, item.html_options(:selected => selected))
       end
 
       def render_unattached_menu_item(menu_item, project)
         raise MenuError, ":child_menus must be an array of MenuItems" unless menu_item.is_a? MenuItem
 
-        if menu_item.allowed?(User.current, project)
-          link_to(menu_item.caption, menu_item.url, menu_item.html_options)
+        if User.current.allowed_to?(menu_item.url, project)
+          link_to(h(menu_item.caption),
+                  menu_item.url,
+                  menu_item.html_options)
         end
       end
 
       def menu_items_for(menu, project=nil)
         items = []
         Redmine::MenuManager.items(menu).root.children.each do |node|
-          if node.allowed?(User.current, project)
+          if allowed_node?(node, User.current, project)
             if block_given?
               yield node
             else
@@ -207,30 +176,31 @@ module Redmine
 
       def extract_node_details(node, project=nil)
         item = node
-        url =
-          case item.url
-          when Hash
-            project.nil? ? item.url : {item.param => project}.merge(item.url)
-          when Symbol
-            if project
-              send(item.url, project)
-            else
-              send(item.url)
-            end
-          else
-            item.url
-          end
+        url = case item.url
+        when Hash
+          project.nil? ? item.url : {item.param => project}.merge(item.url)
+        when Symbol
+          send(item.url)
+        else
+          item.url
+        end
         caption = item.caption(project)
         return [caption, url, (current_menu_item == item.name)]
       end
 
-      # See MenuItem#allowed?
+      # Checks if a user is allowed to access the menu item by:
+      #
+      # * Checking the url target (project only)
+      # * Checking the conditions of the item
       def allowed_node?(node, user, project)
-        unless node.is_a? MenuItem
-          raise MenuError, ":child_menus must be an array of MenuItems"
+        if project && user && !user.allowed_to?(node.url, project)
+          return false
         end
-
-        node.allowed?(user, project)
+        if node.condition && !node.condition.call(project)
+          # Condition that doesn't pass
+          return false
+        end
+        return true
       end
     end
 
@@ -362,9 +332,9 @@ module Redmine
         @children.inject(1) {|sum, node| sum + node.size}
       end
 
-      def each(&block)
+      def each &block
         yield self
-        children {|child| child.each(&block)}
+        children { |child| child.each(&block) }
       end
 
       # Adds a child at first position
@@ -418,28 +388,16 @@ module Redmine
 
     class MenuItem < MenuNode
       include Redmine::I18n
-      attr_reader :name, :url, :param, :condition, :parent,
-                  :child_menus, :last, :permission
+      attr_reader :name, :url, :param, :condition, :parent, :child_menus, :last
 
-      def initialize(name, url, options={})
-        if options[:if] && !options[:if].respond_to?(:call)
-          raise ArgumentError, "Invalid option :if for menu item '#{name}'"
-        end
-        if options[:html] && !options[:html].is_a?(Hash)
-          raise ArgumentError, "Invalid option :html for menu item '#{name}'"
-        end
-        if options[:parent] == name.to_sym
-          raise ArgumentError, "Cannot set the :parent to be the same as this item"
-        end
-        if options[:children] && !options[:children].respond_to?(:call)
-          raise ArgumentError, "Invalid option :children for menu item '#{name}'"
-        end
-
+      def initialize(name, url, options)
+        raise ArgumentError, "Invalid option :if for menu item '#{name}'" if options[:if] && !options[:if].respond_to?(:call)
+        raise ArgumentError, "Invalid option :html for menu item '#{name}'" if options[:html] && !options[:html].is_a?(Hash)
+        raise ArgumentError, "Cannot set the :parent to be the same as this item" if options[:parent] == name.to_sym
+        raise ArgumentError, "Invalid option :children for menu item '#{name}'" if options[:children] && !options[:children].respond_to?(:call)
         @name = name
         @url = url
         @condition = options[:if]
-        @permission = options[:permission]
-        @permission ||= false if options.key?(:permission)
         @param = options[:param] || :id
         @caption = options[:caption]
         @html_options = options[:html] || {}
@@ -473,38 +431,6 @@ module Redmine
         else
           @html_options
         end
-      end
-
-      # Checks if a user is allowed to access the menu item by:
-      #
-      # * Checking the permission or the url target (project only)
-      # * Checking the conditions of the item
-      def allowed?(user, project)
-        if url.blank?
-          # this is a virtual node that is only there for its children to be diplayed in the menu
-          # it is considered an allowed node if at least one of the children is allowed
-          all_children = children
-          all_children += child_menus.call(project) if child_menus
-          unless all_children.detect{|child| child.allowed?(user, project)}
-            return false
-          end
-        elsif user && project
-          if permission
-            unless user.allowed_to?(permission, project)
-              return false
-            end
-          elsif permission.nil? && url.is_a?(Hash)
-            unless user.allowed_to?(url, project)
-              return false
-            end
-          end
-        end
-        if condition && !condition.call(project)
-          # Condition that doesn't pass
-          return false
-        end
-
-        return true
       end
     end
   end

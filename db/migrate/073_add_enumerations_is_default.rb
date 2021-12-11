@@ -1,4 +1,4 @@
-class AddEnumerationsIsDefault < ActiveRecord::Migration[4.2]
+class AddEnumerationsIsDefault < ActiveRecord::Migration
   def self.up
     add_column :enumerations, :is_default, :boolean, :default => false, :null => false
   end

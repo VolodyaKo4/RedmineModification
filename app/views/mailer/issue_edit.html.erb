@@ -1,15 +1,25 @@
 <% if @journal.private_notes? %>
   (<%= l(:field_private_notes) %>)
 <% end %>
-<%= l(:text_issue_updated, :id => link_to("##{@issue.id}", @issue_url), :author => h(@journal.user)).html_safe %>
-<hr />
+<%= l(:text_issue_updated, :id => "##{@issue.id}", :author => h(@journal.user)) %>
+<<<<<<< HEAD
+<br>
+<% if !@journal.nil? && !@journal.notes.to_s.strip.empty?%>
+	<b>Comment:</b>
+<% end %>
+<%= textilizable(@journal, :notes, :only_path => false) %>
+=======
+>>>>>>> 248a796 (pure version 2.5.1 from http://www.redmine.org/releases/redmine-2.5.1.tar.gz)
 
-<ul class="journal details">
+<ul>
 <% details_to_strings(@journal_details, false, :only_path => false).each do |string| %>
   <li><%= string %></li>
 <% end %>
 </ul>
 
+<<<<<<< HEAD
+=======
 <%= textilizable(@journal, :notes, :only_path => false) %>
+>>>>>>> 248a796 (pure version 2.5.1 from http://www.redmine.org/releases/redmine-2.5.1.tar.gz)
 <hr />
-<%= render :partial => 'issue', :formats => [:html], :locals => { :issue => @issue, :user => @user, :issue_url => @issue_url } %>
+<%= render :partial => 'issue', :formats => [:html], :locals => { :issue => @issue, :users => @users, :issue_url => @issue_url } %>

@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,77 +16,33 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class Tracker < ActiveRecord::Base
-  include Redmine::SafeAttributes
 
-  CORE_FIELDS_UNDISABLABLE = %w(project_id tracker_id subject priority_id is_private).freeze
+  CORE_FIELDS_UNDISABLABLE = %w(project_id tracker_id subject description priority_id is_private).freeze
   # Fields that can be disabled
   # Other (future) fields should be appended, not inserted!
-  CORE_FIELDS =
-    %w(assigned_to_id category_id fixed_version_id parent_issue_id
-       start_date due_date estimated_hours done_ratio description).freeze
+  CORE_FIELDS = %w(assigned_to_id category_id fixed_version_id parent_issue_id start_date due_date estimated_hours done_ratio).freeze
   CORE_FIELDS_ALL = (CORE_FIELDS_UNDISABLABLE + CORE_FIELDS).freeze
 
   before_destroy :check_integrity
-  belongs_to :default_status, :class_name => 'IssueStatus'
   has_many :issues
-  has_many :workflow_rules, :dependent => :delete_all
-  has_and_belongs_to_many :projects
-  has_and_belongs_to_many :custom_fields, :class_name => 'IssueCustomField',
-                          :join_table => "#{table_name_prefix}custom_fields_trackers#{table_name_suffix}",
-                          :association_foreign_key => 'custom_field_id'
-  acts_as_positioned
+  has_many :workflow_rules, :dependent => :delete_all do
+    def copy(source_tracker)
+      WorkflowRule.copy(source_tracker, nil, proxy_association.owner, nil)
+    end
+  end
 
-  validates_presence_of :default_status
+  has_and_belongs_to_many :projects
+  has_and_belongs_to_many :custom_fields, :class_name => 'IssueCustomField', :join_table => "#{table_name_prefix}custom_fields_trackers#{table_name_suffix}", :association_foreign_key => 'custom_field_id'
+  acts_as_list
+
+  attr_protected :fields_bits
+
   validates_presence_of :name
   validates_uniqueness_of :name
   validates_length_of :name, :maximum => 30
-  validates_length_of :description, :maximum => 255
 
-  scope :sorted, lambda {order(:position)}
+  scope :sorted, lambda { order("#{table_name}.position ASC") }
   scope :named, lambda {|arg| where("LOWER(#{table_name}.name) = LOWER(?)", arg.to_s.strip)}
-
-  # Returns the trackers that are visible by the user.
-  #
-  # Examples:
-  #   project.trackers.visible(user)
-  #   => returns the trackers that are visible by the user in project
-  #
-  #   Tracker.visible(user)
-  #   => returns the trackers that are visible by the user in at least on project
-  scope :visible, (lambda do |*args|
-    user = args.shift || User.current
-    condition = Project.allowed_to_condition(user, :view_issues) do |role, user|
-      unless role.permissions_all_trackers?(:view_issues)
-        tracker_ids = role.permissions_tracker_ids(:view_issues)
-        if tracker_ids.any?
-          "#{Tracker.table_name}.id IN (#{tracker_ids.join(',')})"
-        else
-          '1=0'
-        end
-      end
-    end
-    joins(:projects).where(condition).distinct
-  end)
-
-  safe_attributes(
-    'name',
-    'default_status_id',
-    'is_in_roadmap',
-    'core_fields',
-    'position',
-    'custom_field_ids',
-    'project_ids',
-    'description')
-
-  def copy_from(arg, options={})
-    return if arg.blank?
-
-    tracker = arg.is_a?(Tracker) ? arg : Tracker.find_by_id(arg.to_s)
-    self.attributes = tracker.attributes.dup.except("id", "name", "position")
-    self.custom_field_ids = tracker.custom_field_ids.dup
-    self.project_ids = tracker.project_ids.dup
-    self
-  end
 
   def to_s; name end
 
@@ -99,26 +53,22 @@ class Tracker < ActiveRecord::Base
   # Returns an array of IssueStatus that are used
   # in the tracker's workflows
   def issue_statuses
-    @issue_statuses ||= IssueStatus.where(:id => issue_status_ids).to_a.sort
-  end
-
-  def issue_status_ids
-    if new_record?
-      []
-    else
-      @issue_status_ids ||=
-        WorkflowTransition.where(:tracker_id => id).
-          distinct.pluck(:old_status_id, :new_status_id).flatten.uniq
+    if @issue_statuses
+      return @issue_statuses
+    elsif new_record?
+      return []
     end
+
+    ids = WorkflowTransition.
+            connection.select_rows("SELECT DISTINCT old_status_id, new_status_id FROM #{WorkflowTransition.table_name} WHERE tracker_id = #{id} AND type = 'WorkflowTransition'").
+            flatten.
+            uniq
+    @issue_statuses = IssueStatus.where(:id => ids).all.sort
   end
 
   def disabled_core_fields
     i = -1
-    @disabled_core_fields ||=
-      CORE_FIELDS.select do
-        i += 1
-        (fields_bits || 0) & (1 << i) != 0
-      end
+    @disabled_core_fields ||= CORE_FIELDS.select { i += 1; (fields_bits || 0) & (2 ** i) != 0}
   end
 
   def core_fields
@@ -131,7 +81,7 @@ class Tracker < ActiveRecord::Base
     bits = 0
     CORE_FIELDS.each_with_index do |field, i|
       unless fields.include?(field)
-        bits |= 1 << i
+        bits |= 2 ** i
       end
     end
     self.fields_bits = bits
@@ -139,14 +89,10 @@ class Tracker < ActiveRecord::Base
     core_fields
   end
 
-  def copy_workflow_rules(source_tracker)
-    WorkflowRule.copy(source_tracker, nil, self, nil)
-  end
-
   # Returns the fields that are disabled for all the given trackers
   def self.disabled_core_fields(trackers)
     if trackers.present?
-      trackers.map(&:disabled_core_fields).reduce(:&)
+      trackers.uniq.map(&:disabled_core_fields).reduce(:&)
     else
       []
     end
@@ -161,9 +107,8 @@ class Tracker < ActiveRecord::Base
     end
   end
 
-  private
-
+private
   def check_integrity
-    raise "Cannot delete tracker" if Issue.where(:tracker_id => self.id).any?
+    raise Exception.new("Can't delete tracker") if Issue.where(:tracker_id => self.id).any?
   end
 end

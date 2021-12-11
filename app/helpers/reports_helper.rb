@@ -1,7 +1,7 @@
-# frozen_string_literal: true
-
+# encoding: utf-8
+#
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -21,17 +21,13 @@ module ReportsHelper
 
   def aggregate(data, criteria)
     a = 0
-    data.each do |row|
+    data.each { |row|
       match = 1
-      criteria.each do |k, v|
-        unless (row[k].to_s == v.to_s) ||
-                 (k == 'closed' &&
-                   (v == 0 ? ['f', false] : ['t', true]).include?(row[k]))
-          match = 0
-        end
-      end unless criteria.nil?
+      criteria.each { |k, v|
+        match = 0 unless (row[k].to_s == v.to_s) || (k == 'closed' &&  (v == 0 ? ['f', false] : ['t', true]).include?(row[k]))
+      } unless criteria.nil?
       a = a + row["total"].to_i if match == 1
-    end unless data.nil?
+    } unless data.nil?
     a
   end
 

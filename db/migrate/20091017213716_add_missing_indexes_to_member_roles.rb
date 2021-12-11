@@ -1,4 +1,4 @@
-class AddMissingIndexesToMemberRoles < ActiveRecord::Migration[4.2]
+class AddMissingIndexesToMemberRoles < ActiveRecord::Migration
   def self.up
     add_index :member_roles, :member_id
     add_index :member_roles, :role_id

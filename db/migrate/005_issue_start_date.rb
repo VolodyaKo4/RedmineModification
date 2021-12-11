@@ -1,4 +1,4 @@
-class IssueStartDate < ActiveRecord::Migration[4.2]
+class IssueStartDate < ActiveRecord::Migration
   def self.up
     add_column :issues, :start_date, :date
     add_column :issues, :done_ratio, :integer, :default => 0, :null => false

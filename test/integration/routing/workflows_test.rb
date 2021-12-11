@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,16 +17,29 @@
 
 require File.expand_path('../../../test_helper', __FILE__)
 
-class RoutingWorkflowsTest < Redmine::RoutingTest
+class RoutingWorkflowsTest < ActionController::IntegrationTest
   def test_workflows
-    should_route 'GET /workflows' => 'workflows#index'
-    should_route 'GET /workflows/edit' => 'workflows#edit'
-    should_route 'POST /workflows/edit' => 'workflows#edit'
-
-    should_route 'GET /workflows/permissions' => 'workflows#permissions'
-    should_route 'POST /workflows/permissions' => 'workflows#permissions'
-
-    should_route 'GET /workflows/copy' => 'workflows#copy'
-    should_route 'POST /workflows/copy' => 'workflows#copy'
+    assert_routing(
+        { :method => 'get', :path => "/workflows" },
+        { :controller => 'workflows', :action => 'index' }
+      )
+    ["get", "post"].each do |method|
+      assert_routing(
+          { :method => method, :path => "/workflows/edit" },
+          { :controller => 'workflows', :action => 'edit' }
+        )
+    end
+    ["get", "post"].each do |method|
+      assert_routing(
+          { :method => method, :path => "/workflows/permissions" },
+          { :controller => 'workflows', :action => 'permissions' }
+        )
+    end
+    ["get", "post"].each do |method|
+      assert_routing(
+          { :method => method, :path => "/workflows/copy" },
+          { :controller => 'workflows', :action => 'copy' }
+        )
+    end
   end
 end

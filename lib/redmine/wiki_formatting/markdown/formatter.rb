@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -24,20 +22,17 @@ module Redmine
     module Markdown
       class HTML < Redcarpet::Render::HTML
         include ActionView::Helpers::TagHelper
-        include Redmine::Helpers::URL
 
         def link(link, title, content)
-          return nil unless uri_with_safe_scheme?(link)
-
           css = nil
           unless link && link.starts_with?('/')
             css = 'external'
           end
-          content_tag('a', content.to_s.html_safe, :href => link, :title => title, :class => css)
+          content_tag('a', content.html_safe, :href => link, :title => title, :class => css)
         end
 
         def block_code(code, language)
-          if language.present? && Redmine::SyntaxHighlighting.language_supported?(language)
+          if language.present?
             "<pre><code class=\"#{CGI.escapeHTML language} syntaxhl\">" +
               Redmine::SyntaxHighlighting.highlight_by_language(code, language) +
               "</code></pre>"
@@ -45,25 +40,23 @@ module Redmine
             "<pre>" + CGI.escapeHTML(code) + "</pre>"
           end
         end
-
-        def image(link, title, alt_text)
-          return unless uri_with_safe_scheme?(link)
-
-          tag('img', :src => link, :alt => alt_text || "", :title => title)
-        end
       end
 
       class Formatter
-        include Redmine::WikiFormatting::LinksHelper
-        alias :inline_restore_redmine_links :restore_redmine_links
-
         def initialize(text)
           @text = text
         end
 
         def to_html(*args)
           html = formatter.render(@text)
-          html = inline_restore_redmine_links(html)
+          # restore wiki links eg. [[Foo]]
+          html.gsub!(%r{\[<a href="(.*?)">(.*?)</a>\]}) do
+            "[[#{$2}]]"
+          end
+          # restore Redmine links with double-quotes, eg. version:"1.0"
+          html.gsub!(/(\w):&quot;(.+?)&quot;/) do
+            "#{$1}:\"#{$2}\""
+          end
           html
         end
 
@@ -78,24 +71,25 @@ module Redmine
           if hash.present? && hash != Digest::MD5.hexdigest(t[1])
             raise Redmine::WikiFormatting::StaleSectionError
           end
-
           t[1] = update unless t[1].blank?
           t.reject(&:blank?).join "\n\n"
         end
 
         def extract_sections(index)
-          sections = [+'', +'', +'']
+          sections = ['', '', '']
           offset = 0
           i = 0
           l = 1
           inside_pre = false
-          @text.split(/(^(?:\S+\r?\n\r?(?:\=+|\-+)|#+.+|(?:~~~|```).*)\s*$)/).each do |part|
+          @text.split(/(^(?:.+\r?\n\r?(?:\=+|\-+)|#+.+|~~~.*)\s*$)/).each do |part|
             level = nil
-            if part =~ /\A(~{3,}|`{3,})(\s*\S+)?\s*$/
-              if !inside_pre
-                inside_pre = true
-              elsif !$2
-                inside_pre = false
+            if part =~ /\A~{3,}(\S+)?\s*$/
+              if $1
+                if !inside_pre
+                  inside_pre = true
+                end
+              else
+                inside_pre = !inside_pre
               end
             elsif inside_pre
               # nop
@@ -133,11 +127,7 @@ module Redmine
             :space_after_headers => true,
             :tables => true,
             :strikethrough => true,
-            :superscript => true,
-            :no_intra_emphasis => true,
-            :footnotes => true,
-            :lax_spacing => true,
-            :underline => true
+            :superscript => true
           )
         end
       end

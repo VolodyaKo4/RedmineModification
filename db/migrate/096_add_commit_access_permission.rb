@@ -1,4 +1,4 @@
-class AddCommitAccessPermission < ActiveRecord::Migration[4.2]
+class AddCommitAccessPermission < ActiveRecord::Migration
   def self.up
     Role.all.select { |r| not r.builtin? }.each do |r|
       r.add_permission!(:commit_access)

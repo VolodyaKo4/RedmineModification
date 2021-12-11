@@ -1,4 +1,4 @@
-class AddQueriesGroupBy < ActiveRecord::Migration[4.2]
+class AddQueriesGroupBy < ActiveRecord::Migration
   def self.up
     add_column :queries, :group_by, :string
   end

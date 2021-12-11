@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -24,7 +22,7 @@ module Redmine
 
     @@available_event_types = []
     @@default_event_types = []
-    @@providers = Hash.new {|h, k| h[k]=[]}
+    @@providers = Hash.new {|h,k| h[k]=[] }
 
     class << self
       def map(&block)
@@ -42,12 +40,6 @@ module Redmine
         @@available_event_types << event_type unless @@available_event_types.include?(event_type)
         @@default_event_types << event_type unless options[:default] == false
         @@providers[event_type] += providers
-      end
-
-      def delete(event_type)
-        @@available_event_types.delete event_type
-        @@default_event_types.delete event_type
-        @@providers.delete(event_type)
       end
     end
   end

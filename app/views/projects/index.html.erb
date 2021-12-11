@@ -1,38 +1,32 @@
+<% content_for :header_tags do %>
+    <%= auto_discovery_link_tag(:atom, {:action => 'index', :format => 'atom', :key => User.current.rss_key}) %>
+<% end %>
+
 <div class="contextual">
-  <%= form_tag({}, :method => :get) do %>
-  <% end %>
-  <%= render_project_action_links %>
+    <%= render_project_action_links %>
 </div>
 
-<h2><%= @query.new_record? ? l(:label_project_plural) : @query.name %></h2>
+<h2><%= l(:label_project_plural) %></h2>
 
-<%= form_tag(projects_path(@project, nil), :method => :get, :id => 'query_form') do %>
-<%= render :partial => 'queries/query_form' %>
-<% end %>
-
-<% if @query.valid? %>
-  <% if @entries.empty? %>
-    <p class="nodata"><%= l(:label_no_data) %></p>
-  <% else %>
-    <%= render :partial => @query.display_type, :locals => { :entries => @entries }%>
-  <% end %>
-<% end %>
+<div id="projects-index">
+<%= render_project_hierarchy(@projects) %>
+</div>
 
 <% if User.current.logged? %>
 <p style="text-align:right;">
-<span class="icon icon-user my-project"><%= l(:label_my_projects) %></span>
-<span class="icon icon-bookmarked-project"><%= l(:label_my_bookmarks) %></span>
+<span class="my-project"><%= l(:label_my_projects) %></span>
 </p>
-<% end %>
-
-<% content_for :sidebar do %>
-  <%= render :partial => 'projects/sidebar' %>
 <% end %>
 
 <% other_formats_links do |f| %>
   <%= f.link_to 'Atom', :url => {:key => User.current.rss_key} %>
-  <% if @query.display_type == 'list' %>
-    <%= f.link_to_with_query_parameters 'CSV', {}, :onclick => "showModal('csv-export-options', '350px'); return false;" %>
+<% end %>
+
+<% content_for :sidebar do %>
+  <%= form_tag({}, :method => :get) do %>
+    <h3><%= l(:label_project_plural) %></h3>
+    <label for="closed"><%= check_box_tag 'closed', 1, params[:closed] %> <%= l(:label_show_closed_projects) %></label>
+    <p><%= submit_tag l(:button_apply), :class => 'button-small', :name => nil %></p>
   <% end %>
 <% end %>
 

@@ -1,4 +1,4 @@
-class FixUsersCustomValues < ActiveRecord::Migration[4.2]
+class FixUsersCustomValues < ActiveRecord::Migration
   def self.up
     CustomValue.where("customized_type = 'User'").
       update_all("customized_type = 'Principal'")

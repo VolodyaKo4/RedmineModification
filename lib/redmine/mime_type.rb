@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -17,11 +15,13 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+require 'mime/types'
+
 module Redmine
   module MimeType
 
     MIME_TYPES = {
-      'text/plain' => 'txt,tpl,properties,patch,diff,ini,readme,install,upgrade,sql',
+      'text/plain' => 'txt,tpl,properties,patch,diff,ini,readme,install,upgrade',
       'text/css' => 'css',
       'text/html' => 'html,htm,xhtml',
       'text/jsp' => 'jsp',
@@ -35,7 +35,6 @@ module Redmine
       'text/x-ruby' => 'rb,rbw,ruby,rake,erb',
       'text/x-csh' => 'csh',
       'text/x-sh' => 'sh',
-      'text/x-textile' => 'textile',
       'text/xml' => 'xml,xsd,mxml',
       'text/yaml' => 'yml,yaml',
       'text/csv' => 'csv',
@@ -47,8 +46,6 @@ module Redmine
       'image/x-ms-bmp' => 'bmp',
       'application/javascript' => 'js',
       'application/pdf' => 'pdf',
-      'video/mp4' => 'mp4',
-      'video/webm' => 'webm',
     }.freeze
 
     EXTENSIONS = MIME_TYPES.inject({}) do |map, (type, exts)|
@@ -56,30 +53,30 @@ module Redmine
       map
     end
 
-    # returns all full mime types for a given (top level) type
-    def self.by_type(type)
-      MIME_TYPES.keys.select{|m| m.start_with? "#{type}/"}
-    end
-
     # returns mime type for name or nil if unknown
     def self.of(name)
-      ext = File.extname(name.to_s)[1..-1]
-      if ext
-        ext.downcase!
-        EXTENSIONS[ext] || MiniMime.lookup_by_extension(ext)&.content_type
+      return nil unless name.present?
+      if m = name.to_s.match(/(^|\.)([^\.]+)$/)
+        extension = m[2].downcase
+        @known_types ||= Hash.new do |h, ext|
+          type = EXTENSIONS[ext]
+          type ||= MIME::Types.find {|type| type.extensions.include?(ext)}.to_s.presence
+          h[ext] = type
+        end
+        @known_types[extension]
       end
     end
 
     # Returns the css class associated to
     # the mime type of name
     def self.css_class_of(name)
-      mimetype = of(name)
-      mimetype&.tr('/', '-')
+      mime = of(name)
+      mime && mime.gsub('/', '-')
     end
 
     def self.main_mimetype_of(name)
       mimetype = of(name)
-      mimetype&.split('/')&.first
+      mimetype.split('/').first if mimetype
     end
 
     # return true if mime-type for name is type/*

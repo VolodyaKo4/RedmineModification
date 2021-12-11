@@ -1,4 +1,4 @@
-class AddChangesBranch < ActiveRecord::Migration[4.2]
+class AddChangesBranch < ActiveRecord::Migration
   def self.up
     add_column :changes, :branch, :string
   end

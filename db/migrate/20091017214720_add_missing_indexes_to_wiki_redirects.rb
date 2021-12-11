@@ -1,4 +1,4 @@
-class AddMissingIndexesToWikiRedirects < ActiveRecord::Migration[4.2]
+class AddMissingIndexesToWikiRedirects < ActiveRecord::Migration
   def self.up
     add_index :wiki_redirects, :wiki_id
   end

@@ -1,4 +1,4 @@
-class ChangeUsersLoginLimit < ActiveRecord::Migration[4.2]
+class ChangeUsersLoginLimit < ActiveRecord::Migration
   def self.up
     change_column :users, :login, :string, :limit => nil, :default => '', :null => false
   end

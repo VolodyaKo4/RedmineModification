@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -22,9 +20,6 @@ require File.expand_path('../../../../test_helper', __FILE__)
 class Redmine::PluginTest < ActiveSupport::TestCase
   def setup
     @klass = Redmine::Plugin
-    # Change plugin directory for testing to default
-    # plugins/foo => test/fixtures/plugins/foo
-    @klass.directory = Rails.root.join('test/fixtures/plugins')
     # In case some real plugins are installed
     @klass.clear
   end
@@ -34,7 +29,7 @@ class Redmine::PluginTest < ActiveSupport::TestCase
   end
 
   def test_register
-    @klass.register :foo_plugin do
+    @klass.register :foo do
       name 'Foo plugin'
       url 'http://example.net/plugins/foo'
       author 'John Smith'
@@ -46,9 +41,9 @@ class Redmine::PluginTest < ActiveSupport::TestCase
 
     assert_equal 1, @klass.all.size
 
-    plugin = @klass.find('foo_plugin')
+    plugin = @klass.find('foo')
     assert plugin.is_a?(Redmine::Plugin)
-    assert_equal :foo_plugin, plugin.id
+    assert_equal :foo, plugin.id
     assert_equal 'Foo plugin', plugin.name
     assert_equal 'http://example.net/plugins/foo', plugin.url
     assert_equal 'John Smith', plugin.author
@@ -57,23 +52,15 @@ class Redmine::PluginTest < ActiveSupport::TestCase
     assert_equal '0.0.1', plugin.version
   end
 
-  def test_register_should_raise_error_if_plugin_directory_does_not_exist
-    e = assert_raises Redmine::PluginNotFound do
-      @klass.register(:bar_plugin) {}
-    end
-
-    assert_equal "Plugin not found. The directory for plugin bar_plugin should be #{Rails.root.join('test/fixtures/plugins/bar_plugin')}.", e.message
-  end
-
   def test_installed
-    @klass.register(:foo_plugin) {}
-    assert_equal true, @klass.installed?(:foo_plugin)
+    @klass.register(:foo) {}
+    assert_equal true, @klass.installed?(:foo)
     assert_equal false, @klass.installed?(:bar)
   end
 
   def test_menu
     assert_difference 'Redmine::MenuManager.items(:project_menu).size' do
-      @klass.register :foo_plugin do
+      @klass.register :foo do
         menu :project_menu, :foo_menu_item, '/foo', :caption => 'Foo'
       end
     end
@@ -81,36 +68,32 @@ class Redmine::PluginTest < ActiveSupport::TestCase
     assert_not_nil menu_item
     assert_equal 'Foo', menu_item.caption
     assert_equal '/foo', menu_item.url
-  ensure
-    Redmine::MenuManager.map(:project_menu).delete(:foo_menu_item)
   end
 
   def test_delete_menu_item
     Redmine::MenuManager.map(:project_menu).push(:foo_menu_item, '/foo', :caption => 'Foo')
     assert_difference 'Redmine::MenuManager.items(:project_menu).size', -1 do
-      @klass.register :foo_plugin do
+      @klass.register :foo do
         delete_menu_item :project_menu, :foo_menu_item
       end
     end
     assert_nil Redmine::MenuManager.items(:project_menu).detect {|i| i.name == :foo_menu_item}
-  ensure
-    Redmine::MenuManager.map(:project_menu).delete(:foo_menu_item)
   end
 
   def test_directory_with_override
     @klass.register(:foo) do
-      directory 'test/fixtures/plugins/foo_plugin'
+      directory '/path/to/foo'
     end
-    assert_equal 'test/fixtures/plugins/foo_plugin', @klass.find('foo').directory
+    assert_equal '/path/to/foo', @klass.find('foo').directory
   end
 
   def test_directory_without_override
-    @klass.register(:other_plugin) {}
-    assert_equal File.join(@klass.directory, 'other_plugin'), @klass.find('other_plugin').directory
+    @klass.register(:foo) {}
+    assert_equal File.join(@klass.directory, 'foo'), @klass.find('foo').directory
   end
 
   def test_requires_redmine
-    plugin = Redmine::Plugin.register(:foo_plugin) {}
+    plugin = Redmine::Plugin.register(:foo) {}
     Redmine::VERSION.stubs(:to_a).returns([2, 1, 3, "stable", 10817])
     # Specific version without hash
     assert plugin.requires_redmine('2.1.3')
@@ -159,50 +142,35 @@ class Redmine::PluginTest < ActiveSupport::TestCase
   def test_requires_redmine_plugin
     test = self
     other_version = '0.5.0'
-    @klass.register :other_plugin do
+    @klass.register :other do
       name 'Other'
       version other_version
     end
-    @klass.register :foo_plugin do
-      test.assert requires_redmine_plugin(:other_plugin, :version_or_higher => '0.1.0')
-      test.assert requires_redmine_plugin(:other_plugin, :version_or_higher => other_version)
-      test.assert requires_redmine_plugin(:other_plugin, other_version)
+    @klass.register :foo do
+      test.assert requires_redmine_plugin(:other, :version_or_higher => '0.1.0')
+      test.assert requires_redmine_plugin(:other, :version_or_higher => other_version)
+      test.assert requires_redmine_plugin(:other, other_version)
       test.assert_raise Redmine::PluginRequirementError do
-        requires_redmine_plugin(:other_plugin, :version_or_higher => '99.0.0')
+        requires_redmine_plugin(:other, :version_or_higher => '99.0.0')
       end
-      test.assert requires_redmine_plugin(:other_plugin, :version => other_version)
-      test.assert requires_redmine_plugin(:other_plugin, :version => [other_version, '99.0.0'])
+      test.assert requires_redmine_plugin(:other, :version => other_version)
+      test.assert requires_redmine_plugin(:other, :version => [other_version, '99.0.0'])
       test.assert_raise Redmine::PluginRequirementError do
-        requires_redmine_plugin(:other_plugin, :version => '99.0.0')
+        requires_redmine_plugin(:other, :version => '99.0.0')
       end
       test.assert_raise Redmine::PluginRequirementError do
-        requires_redmine_plugin(:other_plugin, :version => ['98.0.0', '99.0.0'])
+        requires_redmine_plugin(:other, :version => ['98.0.0', '99.0.0'])
       end
       # Missing plugin
-      test.assert_raise Redmine::PluginRequirementError do
+      test.assert_raise Redmine::PluginNotFound do
         requires_redmine_plugin(:missing, :version_or_higher => '0.1.0')
       end
-      test.assert_raise Redmine::PluginRequirementError do
+      test.assert_raise Redmine::PluginNotFound do
         requires_redmine_plugin(:missing, '0.1.0')
       end
-      test.assert_raise Redmine::PluginRequirementError do
+      test.assert_raise Redmine::PluginNotFound do
         requires_redmine_plugin(:missing, :version => '0.1.0')
       end
     end
-  end
-
-  def test_settings_warns_about_possible_partial_collision
-    @klass.register(:foo_plugin) {settings :partial => 'foo/settings'}
-    Rails.logger.expects(:warn)
-    @klass.register(:other_plugin) {settings :partial => 'foo/settings'}
-  end
-
-  def test_migrate_redmine_plugin
-    @klass.register :foo_plugin do
-      name 'Foo plugin'
-      version '0.0.1'
-    end
-
-    assert Redmine::Plugin.migrate('foo_plugin')
   end
 end

@@ -1,4 +1,4 @@
-class AddMessagesSticky < ActiveRecord::Migration[4.2]
+class AddMessagesSticky < ActiveRecord::Migration
   def self.up
     add_column :messages, :sticky, :integer, :default => 0
   end

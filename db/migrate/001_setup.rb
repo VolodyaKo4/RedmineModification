@@ -15,11 +15,9 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-class Setup < ActiveRecord::Migration[4.2]
+class Setup < ActiveRecord::Migration
 
-  class User < ActiveRecord::Base
-  end
-
+  class User < ActiveRecord::Base; end
   # model removed
   class Permission < ActiveRecord::Base; end
 
@@ -287,17 +285,14 @@ class Setup < ActiveRecord::Migration[4.2]
     Permission.create :controller => "versions", :action => "destroy_file", :description => "button_delete", :sort => 1322
 
     # create default administrator account
-    user = User.new :firstname => "Redmine",
-                    :lastname => "Admin",
-                    :mail => "admin@example.net",
-                    :mail_notification => true,
-                    :status => 1
-    user.login = 'admin'
-    user.hashed_password = "d033e22ae348aeb5660fc2140aec35850c4da997"
-    user.admin = true
-    user.save
-
-
+    user = User.create :login => "admin",
+                       :hashed_password => "d033e22ae348aeb5660fc2140aec35850c4da997",
+                       :admin => true,
+                       :firstname => "Redmine",
+                       :lastname => "Admin",
+                       :mail => "admin@example.net",
+                       :mail_notification => true,
+                       :status => 1
   end
 
   def self.down

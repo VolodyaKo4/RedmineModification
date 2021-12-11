@@ -1,7 +1,7 @@
-# frozen_string_literal: true
-
+# encoding: utf-8
+#
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,28 +18,16 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 module UsersHelper
-  include ApplicationHelper
-
   def users_status_options_for_select(selected)
     user_count_by_status = User.group('status').count.to_hash
-    options_for_select([[l(:label_all), '']] + (User.valid_statuses.map {|c| ["#{l('status_' + User::LABEL_BY_STATUS[c])} (#{user_count_by_status[c].to_i})", c]}), selected.to_s)
+    options_for_select([[l(:label_all), ''],
+                        ["#{l(:status_active)} (#{user_count_by_status[1].to_i})", '1'],
+                        ["#{l(:status_registered)} (#{user_count_by_status[2].to_i})", '2'],
+                        ["#{l(:status_locked)} (#{user_count_by_status[3].to_i})", '3']], selected.to_s)
   end
 
   def user_mail_notification_options(user)
     user.valid_notification_options.collect {|o| [l(o.last), o.first]}
-  end
-
-  def textarea_font_options
-    [[l(:label_font_default), '']] + UserPreference::TEXTAREA_FONT_OPTIONS.map {|o| [l("label_font_#{o}"), o]}
-  end
-
-  def history_default_tab_options
-    [[l('label_issue_history_notes'), 'notes'],
-     [l('label_history'), 'history'],
-     [l('label_issue_history_properties'), 'properties'],
-     [l('label_time_entry_plural'), 'time_entries'],
-     [l('label_associated_revisions'), 'changesets'],
-     [l('label_last_tab_visited'), 'last_tab_visited']]
   end
 
   def change_status_link(user)
@@ -54,81 +42,13 @@ module UsersHelper
     end
   end
 
-  def additional_emails_link(user)
-    if user.email_addresses.count > 1 || Setting.max_additional_emails.to_i > 0
-      link_to l(:label_email_address_plural), user_email_addresses_path(@user), :class => 'icon icon-email-add', :remote => true
-    end
-  end
-
-  def user_emails(user)
-    emails = [user.mail]
-    emails += user.email_addresses.order(:id).where(:is_default => false).pluck(:address)
-    emails.map {|email| mail_to(email, nil)}.join(', ').html_safe
-  end
-
   def user_settings_tabs
-    tabs =
-      [
-        {:name => 'general', :partial => 'users/general', :label => :label_general},
-        {:name => 'memberships', :partial => 'users/memberships', :label => :label_project_plural}
-      ]
-    if Group.givable.any?
+    tabs = [{:name => 'general', :partial => 'users/general', :label => :label_general},
+            {:name => 'memberships', :partial => 'users/memberships', :label => :label_project_plural}
+            ]
+    if Group.all.any?
       tabs.insert 1, {:name => 'groups', :partial => 'users/groups', :label => :label_group_plural}
     end
     tabs
-  end
-
-  def csv_content(column_name, user)
-    case column_name
-    when 'status'
-      l("status_#{User::LABEL_BY_STATUS[user.status]}")
-    when 'twofa_scheme'
-      if user.twofa_active?
-        l("twofa__#{user.twofa_scheme}__name")
-      else
-        l(:label_disabled)
-      end
-    else
-      user.send(column_name)
-    end
-  end
-
-  def users_to_csv(users)
-    Redmine::Export::CSV.generate(:encoding => params[:encoding]) do |csv|
-      columns = [
-        'login',
-        'firstname',
-        'lastname',
-        'mail',
-        'admin',
-        'status',
-        'twofa_scheme',
-        'created_on',
-        'updated_on',
-        'last_login_on',
-        'passwd_changed_on'
-      ]
-      user_custom_fields = UserCustomField.sorted
-
-      # csv header fields
-      csv << columns.map {|column| l('field_' + column)} + user_custom_fields.pluck(:name)
-      # csv lines
-      users = users.preload(:custom_values)
-      users.each do |user|
-        values = columns.map {|c| csv_content(c, user)} +
-                 user_custom_fields.map {|custom_field| user.custom_value_for(custom_field)}
-
-        csv << values.map do |value|
-          format_object(value, false) do |v|
-            case v.class.name
-            when 'Float'
-              sprintf('%.2f', v).gsub('.', l(:general_csv_decimal_separator))
-            else
-              v
-            end
-          end
-        end
-      end
-    end
   end
 end

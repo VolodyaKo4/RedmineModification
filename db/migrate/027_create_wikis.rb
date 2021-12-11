@@ -1,4 +1,4 @@
-class CreateWikis < ActiveRecord::Migration[4.2]
+class CreateWikis < ActiveRecord::Migration
   def self.up
     create_table :wikis do |t|
       t.column :project_id, :integer, :null => false

@@ -1,4 +1,4 @@
-class RemoveProjectsProjectsCount < ActiveRecord::Migration[4.2]
+class RemoveProjectsProjectsCount < ActiveRecord::Migration
   def self.up
     remove_column :projects, :projects_count
   end

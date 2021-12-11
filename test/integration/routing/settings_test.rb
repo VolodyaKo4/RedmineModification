@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,13 +17,24 @@
 
 require File.expand_path('../../../test_helper', __FILE__)
 
-class RoutingSettingsTest < Redmine::RoutingTest
+class RoutingSettingsTest < ActionController::IntegrationTest
   def test_settings
-    should_route 'GET /settings' => 'settings#index'
-    should_route 'GET /settings/edit' => 'settings#edit'
-    should_route 'POST /settings/edit' => 'settings#edit'
-
-    should_route 'GET /settings/plugin/testid' => 'settings#plugin', :id => 'testid'
-    should_route 'POST /settings/plugin/testid' => 'settings#plugin', :id => 'testid'
+    assert_routing(
+        { :method => 'get', :path => "/settings" },
+        { :controller => 'settings', :action => 'index' }
+      )
+    ["get", "post"].each do |method|
+      assert_routing(
+          { :method => method, :path => "/settings/edit" },
+          { :controller => 'settings', :action => 'edit' }
+        )
+    end
+    ["get", "post"].each do |method|
+      assert_routing(
+          { :method => method, :path => "/settings/plugin/testid" },
+          { :controller => 'settings', :action => 'plugin',
+            :id => 'testid' }
+        )
+    end
   end
 end

@@ -1,4 +1,4 @@
-class AddQueriesVisibility < ActiveRecord::Migration[4.2]
+class AddQueriesVisibility < ActiveRecord::Migration
   def up
     add_column :queries, :visibility, :integer, :default => 0
     Query.where(:is_public => true).update_all(:visibility => 2)

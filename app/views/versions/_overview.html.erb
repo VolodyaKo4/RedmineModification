@@ -1,4 +1,3 @@
-<div class="version-overview">
 <% if version.completed? %>
   <p><%= format_date(version.effective_date) %></p>
 <% elsif version.effective_date %>
@@ -8,31 +7,33 @@
 <p><%=h version.description %></p>
 <% if version.custom_field_values.any? %>
 <ul>
-  <% render_custom_field_values(version) do |custom_field, formatted| %>
-    <li><span class="label"><%= custom_field.name %>:</span> <%= formatted %></li>
+  <% version.custom_field_values.each do |custom_value| %>
+    <% if custom_value.value.present? %>
+       <li><%=h custom_value.custom_field.name %>: <%=h show_value(custom_value) %></li>
+    <% end %>
   <% end %>
 </ul>
 <% end %>
 
-<% if version.visible_fixed_issues.count > 0 %>
-    <%= progress_bar([version.visible_fixed_issues.closed_percent, version.visible_fixed_issues.completed_percent],
-                     :titles =>
-                       ["%s: %i%%" % [l(:label_closed_issues_plural), version.visible_fixed_issues.closed_percent],
-                        "%s: %i%%" % [l(:field_done_ratio), version.visible_fixed_issues.completed_percent]],
-                     :legend => ('%i%%' % version.visible_fixed_issues.completed_percent)) %>
+<% if version.issues_count > 0 %>
+    <%= progress_bar([version.closed_percent, version.completed_percent],
+                     :width => '40em', :legend => ('%0.0f%' % version.completed_percent)) %>
     <p class="progress-info">
-      <%= link_to(l(:label_x_issues, :count => version.visible_fixed_issues.count),
-                  version_filtered_issues_path(version, :status_id => '*')) %>
-      &nbsp;
-      (<%= link_to_if(version.visible_fixed_issues.closed_count > 0,
-                      l(:label_x_closed_issues_abbr, :count => version.visible_fixed_issues.closed_count),
-                      version_filtered_issues_path(version, :status_id => 'c')) %>
-      &#8212;
-      <%= link_to_if(version.visible_fixed_issues.open_count > 0,
-                     l(:label_x_open_issues_abbr, :count => version.visible_fixed_issues.open_count),
-                     version_filtered_issues_path(version, :status_id => 'o')) %>)
+      <%= link_to(l(:label_x_issues, :count => version.issues_count), 
+                  project_issues_path(version.project,
+                  :status_id => '*', :fixed_version_id => version,
+                  :set_filter => 1)) %>
+        &nbsp;
+        (<%= link_to_if(version.closed_issues_count > 0,
+                        l(:label_x_closed_issues_abbr, :count => version.closed_issues_count), 
+                        project_issues_path(version.project, :status_id => 'c',
+                        :fixed_version_id => version, :set_filter => 1)) %>
+        &#8212;
+        <%= link_to_if(version.open_issues_count > 0,
+                       l(:label_x_open_issues_abbr, :count => version.open_issues_count), 
+                       project_issues_path(version.project, :status_id => 'o',
+                       :fixed_version_id => version, :set_filter => 1)) %>)
     </p>
 <% else %>
     <p class="progress-info"><%= l(:label_roadmap_no_issues) %></p>
 <% end %>
-</div>

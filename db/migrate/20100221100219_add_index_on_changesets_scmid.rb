@@ -1,4 +1,4 @@
-class AddIndexOnChangesetsScmid < ActiveRecord::Migration[4.2]
+class AddIndexOnChangesetsScmid < ActiveRecord::Migration
   def self.up
     add_index :changesets, [:repository_id, :scmid], :name => :changesets_repos_scmid
   end

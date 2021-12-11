@@ -1,4 +1,4 @@
-class CreateRepositories < ActiveRecord::Migration[4.2]
+class CreateRepositories < ActiveRecord::Migration
   def self.up
     create_table :repositories, :force => true do |t|
       t.column "project_id", :integer, :default => 0, :null => false

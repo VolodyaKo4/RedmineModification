@@ -1,0 +1,1 @@
+heroku run --app redmine-3s rake redmine:email:receive_imap RAILS_ENV="production" ssl=1 host=imap.yandex.ru port=993 username=help@3soft.ru password=He_onlyHARD8872lp___ folder=test move_on_success=good move_on_failure=bad project=test tracker=Поддержка allow_override=tracker,status,priority no_permission_check=1 unknown_user=accept

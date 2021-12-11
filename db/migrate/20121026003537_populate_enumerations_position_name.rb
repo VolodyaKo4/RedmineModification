@@ -1,4 +1,4 @@
-class PopulateEnumerationsPositionName < ActiveRecord::Migration[4.2]
+class PopulateEnumerationsPositionName < ActiveRecord::Migration
   def up
     IssuePriority.compute_position_names
   end

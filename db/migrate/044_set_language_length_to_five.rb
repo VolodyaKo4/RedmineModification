@@ -1,4 +1,4 @@
-class SetLanguageLengthToFive < ActiveRecord::Migration[4.2]
+class SetLanguageLengthToFive < ActiveRecord::Migration
   def self.up
     change_column :users, :language, :string, :limit => 5, :default => ""
   end

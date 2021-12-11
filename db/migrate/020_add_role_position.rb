@@ -1,4 +1,4 @@
-class AddRolePosition < ActiveRecord::Migration[4.2]
+class AddRolePosition < ActiveRecord::Migration
   def self.up
     add_column :roles, :position, :integer, :default => 1
     Role.all.each_with_index {|role, i| role.update_attribute(:position, i+1)}

@@ -1,4 +1,4 @@
-class AddProjectStatus < ActiveRecord::Migration[4.2]
+class AddProjectStatus < ActiveRecord::Migration
   def self.up
     add_column :projects, :status, :integer, :default => 1, :null => false
   end

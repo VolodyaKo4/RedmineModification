@@ -1,4 +1,4 @@
-class AddMessagesLocked < ActiveRecord::Migration[4.2]
+class AddMessagesLocked < ActiveRecord::Migration
   def self.up
     add_column :messages, :locked, :boolean, :default => false
   end

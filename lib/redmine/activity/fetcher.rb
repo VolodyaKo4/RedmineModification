@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -23,6 +21,9 @@ module Redmine
     class Fetcher
       attr_reader :user, :project, :scope
 
+      # Needs to be unloaded in development mode
+      @@constantized_providers = Hash.new {|h,k| h[k] = Redmine::Activity.providers[k].collect {|t| t.constantize } }
+
       def initialize(user, options={})
         options.assert_valid_keys(:project, :with_subprojects, :author)
         @user = user
@@ -37,31 +38,13 @@ module Redmine
         return @event_types unless @event_types.nil?
 
         @event_types = Redmine::Activity.available_event_types
-        if @project
-          projects = @project.self_and_descendants
-          @event_types = @event_types.select do |event_type|
-            keep = false
-            constantized_providers(event_type).each do |provider|
-              options = provider.activity_provider_options[event_type]
-              permission = options[:permission]
-              unless options.key?(:permission)
-                permission ||= "view_#{event_type}".to_sym
-              end
-              if permission
-                keep |= projects.any? {|p| @user.allowed_to?(permission, p)}
-              else
-                keep = true
-              end
-            end
-            keep
-          end
-        end
+        @event_types = @event_types.select {|o| @project.self_and_descendants.detect {|p| @user.allowed_to?("view_#{o}".to_sym, p)}} if @project
         @event_types
       end
 
       # Yields to filter the activity scope
       def scope_select(&block)
-        @scope = @scope.select {|t| yield t}
+        @scope = @scope.select {|t| yield t }
       end
 
       # Sets the scope
@@ -94,7 +77,7 @@ module Redmine
           end
         end
 
-        e.sort! {|a, b| b.event_datetime <=> a.event_datetime}
+        e.sort! {|a,b| b.event_datetime <=> a.event_datetime}
 
         if options[:limit]
           e = e.slice(0, options[:limit])
@@ -105,7 +88,7 @@ module Redmine
       private
 
       def constantized_providers(event_type)
-        Redmine::Activity.providers[event_type].map(&:constantize)
+        @@constantized_providers[event_type]
       end
     end
   end

@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -31,7 +29,7 @@ class DocumentCategory < Enumeration
   end
 
   def transfer_relations(to)
-    documents.update_all(:category_id => to.id)
+    documents.update_all("category_id = #{to.id}")
   end
 
   def self.default

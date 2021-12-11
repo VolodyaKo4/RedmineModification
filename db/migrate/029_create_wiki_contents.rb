@@ -1,4 +1,4 @@
-class CreateWikiContents < ActiveRecord::Migration[4.2]
+class CreateWikiContents < ActiveRecord::Migration
   def self.up
     create_table :wiki_contents do |t|
       t.column :page_id, :integer, :null => false

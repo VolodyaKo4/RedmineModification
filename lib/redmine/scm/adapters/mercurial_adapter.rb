@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -24,6 +22,7 @@ module Redmine
   module Scm
     module Adapters
       class MercurialAdapter < AbstractAdapter
+
         # Mercurial executable name
         HG_BIN = Redmine::Configuration['scm_mercurial_command'] || "hg"
         HELPERS_DIR = File.dirname(__FILE__) + "/mercurial"
@@ -33,8 +32,6 @@ module Redmine
 
         # raised if hg command exited with error, e.g. unknown revision.
         class HgCommandAborted < CommandFailed; end
-        # raised if bad command argument detected before executing hg.
-        class HgCommandArgumentError < CommandFailed; end
 
         class << self
           def client_command
@@ -57,14 +54,17 @@ module Redmine
             # The hg version is expressed either as a
             # release number (eg 0.9.5 or 1.0) or as a revision
             # id composed of 12 hexa characters.
-            theversion = hgversion_from_command_line.b
+            theversion = hgversion_from_command_line.dup
+            if theversion.respond_to?(:force_encoding)
+              theversion.force_encoding('ASCII-8BIT')
+            end
             if m = theversion.match(%r{\A(.*?)((\d+\.)+\d+)})
               m[2].scan(%r{\d+}).collect(&:to_i)
             end
           end
 
           def hgversion_from_command_line
-            shellout("#{sq_bin} --version") {|io| io.read}.to_s
+            shellout("#{sq_bin} --version") { |io| io.read }.to_s
           end
 
           def template_path
@@ -91,28 +91,27 @@ module Redmine
                    :lastrev => Revision.new(:revision => tip['revision'],
                                             :scmid => tip['node']))
         # rescue HgCommandAborted
-        rescue => e
+        rescue Exception => e
           logger.error "hg: error during getting info: #{e.message}"
           nil
         end
 
         def tags
-          as_ary(summary['repository']['tag']).map {|e| CGI.unescape(e['name'])}
+          as_ary(summary['repository']['tag']).map { |e| e['name'] }
         end
 
         # Returns map of {'tag' => 'nodeid', ...}
         def tagmap
-          map = {}
-          as_ary(summary['repository']['tag']).each do |e|
-            map[CGI.unescape(e['name'])] = e['node']
+          alist = as_ary(summary['repository']['tag']).map do |e|
+            e.values_at('name', 'node')
           end
-          map
+          Hash[*alist.flatten]
         end
 
         def branches
           brs = []
           as_ary(summary['repository']['branch']).each do |e|
-            br = Branch.new(CGI.unescape(e['name']))
+            br = Branch.new(e['name'])
             br.revision =  e['revision']
             br.scmid    =  e['node']
             brs << br
@@ -122,22 +121,22 @@ module Redmine
 
         # Returns map of {'branch' => 'nodeid', ...}
         def branchmap
-          map = {}
-          branches.each do |b|
-            map[b.to_s] = b.scmid
+          alist = as_ary(summary['repository']['branch']).map do |e|
+            e.values_at('name', 'node')
           end
-          map
+          Hash[*alist.flatten]
         end
 
         def summary
           return @summary if @summary
-
           hg 'rhsummary' do |io|
-            output = io.read.force_encoding('UTF-8')
+            output = io.read
+            if output.respond_to?(:force_encoding)
+              output.force_encoding('UTF-8')
+            end
             begin
               @summary = parse_xml(output)['rhsummary']
             rescue
-              # do nothing
             end
           end
         end
@@ -145,13 +144,15 @@ module Redmine
 
         def entries(path=nil, identifier=nil, options={})
           p1 = scm_iconv(@path_encoding, 'UTF-8', path)
-          manifest = hg('rhmanifest', "-r#{CGI.escape(hgrev(identifier))}",
-                        '--', CGI.escape(without_leading_slash(p1.to_s))) do |io|
-            output = io.read.force_encoding('UTF-8')
+          manifest = hg('rhmanifest', '-r', CGI.escape(hgrev(identifier)),
+                        CGI.escape(without_leading_slash(p1.to_s))) do |io|
+            output = io.read
+            if output.respond_to?(:force_encoding)
+              output.force_encoding('UTF-8')
+            end
             begin
               parse_xml(output)['rhmanifest']['repository']['manifest']
             rescue
-              # do nothing
             end
           end
           path_prefix = path.blank? ? '' : with_trailling_slash(path)
@@ -180,24 +181,26 @@ module Redmine
 
         def revisions(path=nil, identifier_from=nil, identifier_to=nil, options={})
           revs = Revisions.new
-          each_revision(path, identifier_from, identifier_to, options) {|e| revs << e}
+          each_revision(path, identifier_from, identifier_to, options) { |e| revs << e }
           revs
         end
 
         # Iterates the revisions by using a template file that
         # makes Mercurial produce a xml output.
         def each_revision(path=nil, identifier_from=nil, identifier_to=nil, options={})
-          hg_args = ['log', '--debug', '-C', "--style=#{self.class.template_path}"]
-          hg_args << "-r#{hgrev(identifier_from)}:#{hgrev(identifier_to)}"
-          hg_args << "--limit=#{options[:limit]}" if options[:limit]
-          hg_args << '--' << hgtarget(path) unless path.blank?
+          hg_args = ['log', '--debug', '-C', '--style', self.class.template_path]
+          hg_args << '-r' << "#{hgrev(identifier_from)}:#{hgrev(identifier_to)}"
+          hg_args << '--limit' << options[:limit] if options[:limit]
+          hg_args << hgtarget(path) unless path.blank?
           log = hg(*hg_args) do |io|
-            output = io.read.force_encoding('UTF-8')
+            output = io.read
+            if output.respond_to?(:force_encoding)
+              output.force_encoding('UTF-8')
+            end
             begin
               # Mercurial < 1.5 does not support footer template for '</log>'
               parse_xml("#{output}</log>")['log']
             rescue
-              # do nothing
             end
           end
           as_ary(log['logentry']).each do |le|
@@ -208,29 +211,21 @@ module Redmine
             end
             cpmap = Hash[*cpalist.flatten]
             paths = as_ary(le['paths']['path']).map do |e|
-              p = scm_iconv('UTF-8', @path_encoding, CGI.unescape(e['__content__']))
+              p = scm_iconv('UTF-8', @path_encoding, CGI.unescape(e['__content__']) )
               {:action        => e['action'],
                :path          => with_leading_slash(p),
                :from_path     => (cpmap.member?(p) ? with_leading_slash(cpmap[p]) : nil),
                :from_revision => (cpmap.member?(p) ? le['node'] : nil)}
-            end
-            paths.sort_by!{|e| e[:path]}
+            end.sort { |a, b| a[:path] <=> b[:path] }
             parents_ary = []
             as_ary(le['parents']['parent']).map do |par|
               parents_ary << par['__content__'] if par['__content__'] != "0000000000000000000000000000000000000000"
             end
             yield Revision.new(:revision => le['revision'],
                                :scmid    => le['node'],
-                               :author   =>
-                                 CGI.unescape(
-                                   begin
-                                     le['author']['__content__']
-                                   rescue
-                                     ''
-                                   end
-                                 ),
+                               :author   => (le['author']['__content__'] rescue ''),
                                :time     => Time.parse(le['date']['__content__']),
-                               :message  => CGI.unescape(le['msg']['__content__']),
+                               :message  => le['msg']['__content__'],
                                :paths    => paths,
                                :parents  => parents_ary)
           end
@@ -239,26 +234,26 @@ module Redmine
 
         # Returns list of nodes in the specified branch
         def nodes_in_branch(branch, options={})
-          hg_args = ['rhlog', '--template={node}\n', "--rhbranch=#{CGI.escape(branch)}"]
-          hg_args << "--from=#{CGI.escape(branch)}"
-          hg_args << '--to=0'
-          hg_args << "--limit=#{options[:limit]}" if options[:limit]
-          hg(*hg_args) {|io| io.readlines.map {|e| e.chomp}}
+          hg_args = ['rhlog', '--template', '{node}\n', '--rhbranch', CGI.escape(branch)]
+          hg_args << '--from' << CGI.escape(branch)
+          hg_args << '--to'   << '0'
+          hg_args << '--limit' << options[:limit] if options[:limit]
+          hg(*hg_args) { |io| io.readlines.map { |e| e.chomp } }
         end
 
         def diff(path, identifier_from, identifier_to=nil)
           hg_args = %w|rhdiff|
           if identifier_to
-            hg_args << "-r#{hgrev(identifier_to)}" << "-r#{hgrev(identifier_from)}"
+            hg_args << '-r' << hgrev(identifier_to) << '-r' << hgrev(identifier_from)
           else
-            hg_args << "-c#{hgrev(identifier_from)}"
+            hg_args << '-c' << hgrev(identifier_from)
           end
           unless path.blank?
             p = scm_iconv(@path_encoding, 'UTF-8', path)
-            hg_args << '--' << CGI.escape(hgtarget(p))
+            hg_args << CGI.escape(hgtarget(p))
           end
           diff = []
-          hg(*hg_args) do |io|
+          hg *hg_args do |io|
             io.each_line do |line|
               diff << line
             end
@@ -270,7 +265,7 @@ module Redmine
 
         def cat(path, identifier=nil)
           p = CGI.escape(scm_iconv(@path_encoding, 'UTF-8', path))
-          hg 'rhcat', "-r#{CGI.escape(hgrev(identifier))}", '--', hgtarget(p) do |io|
+          hg 'rhcat', '-r', CGI.escape(hgrev(identifier)), hgtarget(p) do |io|
             io.binmode
             io.read
           end
@@ -281,10 +276,10 @@ module Redmine
         def annotate(path, identifier=nil)
           p = CGI.escape(scm_iconv(@path_encoding, 'UTF-8', path))
           blame = Annotate.new
-          hg 'rhannotate', '-ncu', "-r#{CGI.escape(hgrev(identifier))}", '--', hgtarget(p) do |io|
+          hg 'rhannotate', '-ncu', '-r', CGI.escape(hgrev(identifier)), hgtarget(p) do |io|
             io.each_line do |line|
-              next unless line.b =~ %r{^([^:]+)\s(\d+)\s([0-9a-f]+):\s(.*)$}
-
+              line.force_encoding('ASCII-8BIT') if line.respond_to?(:force_encoding)
+              next unless line =~ %r{^([^:]+)\s(\d+)\s([0-9a-f]+):\s(.*)$}
               r = Revision.new(:author => $1.strip, :revision => $2, :scmid => $3,
                                :identifier => $3)
               blame.add_line($4.rstrip, r)
@@ -296,15 +291,6 @@ module Redmine
           Annotate.new
         end
 
-        def valid_name?(name)
-          return false unless name.nil? || name.is_a?(String)
-
-          # Mercurials names don't need to be checked further as its CLI
-          # interface is restrictive enough to reject any invalid names on its
-          # own.
-          true
-        end
-
         class Revision < Redmine::Scm::Adapters::Revision
           # Returns the readable identifier
           def format_identifier
@@ -312,36 +298,20 @@ module Redmine
           end
         end
 
-        # command options which may be processed earlier, by faulty parser in hg
-        HG_EARLY_BOOL_ARG = /^--(debugger|profile|traceback)$/
-        HG_EARLY_LIST_ARG = /^(--(config|cwd|repo(sitory)?)\b|-R)/
-        private_constant :HG_EARLY_BOOL_ARG, :HG_EARLY_LIST_ARG
-
         # Runs 'hg' command with the given args
         def hg(*args, &block)
-          # as of hg 4.4.1, early parsing of bool options is not terminated at '--'
-          if args.any? {|s| HG_EARLY_BOOL_ARG.match?(s)}
-            raise HgCommandArgumentError, "malicious command argument detected"
-          end
-          if args.take_while {|s| s != '--'}.any? {|s| HG_EARLY_LIST_ARG.match?(s)}
-            raise HgCommandArgumentError, "malicious command argument detected"
-          end
-
           repo_path = root_url || url
-          full_args = ["-R#{repo_path}", '--encoding=utf-8']
-          # don't use "--config=<value>" form for compatibility with ancient Mercurial
+          full_args = ['-R', repo_path, '--encoding', 'utf-8']
           full_args << '--config' << "extensions.redminehelper=#{HG_HELPER_EXT}"
           full_args << '--config' << 'diff.git=false'
           full_args += args
-          ret =
-            shellout(
-              self.class.sq_bin + ' ' + full_args.map {|e| shell_quote e.to_s}.join(' '),
-              &block
-            )
+          ret = shellout(
+                   self.class.sq_bin + ' ' + full_args.map { |e| shell_quote e.to_s }.join(' '),
+                   &block
+                   )
           if $? && $?.exitstatus != 0
             raise HgCommandAborted, "hg exited with non-zero status: #{$?.exitstatus}"
           end
-
           ret
         end
         private :hg
@@ -362,7 +332,6 @@ module Redmine
 
         def as_ary(o)
           return [] unless o
-
           o.is_a?(Array) ? o : Array[o]
         end
         private :as_ary

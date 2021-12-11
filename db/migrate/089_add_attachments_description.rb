@@ -1,4 +1,4 @@
-class AddAttachmentsDescription < ActiveRecord::Migration[4.2]
+class AddAttachmentsDescription < ActiveRecord::Migration
   def self.up
     add_column :attachments, :description, :string
   end

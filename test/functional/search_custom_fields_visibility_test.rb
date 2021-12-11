@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,7 +17,7 @@
 
 require File.expand_path('../../test_helper', __FILE__)
 
-class SearchCustomFieldsVisibilityTest < Redmine::ControllerTest
+class SearchCustomFieldsVisibilityTest < ActionController::TestCase
   tests SearchController
   fixtures :projects,
            :users,
@@ -31,8 +29,7 @@ class SearchCustomFieldsVisibilityTest < Redmine::ControllerTest
            :projects_trackers,
            :enabled_modules,
            :enumerations,
-           :workflows,
-           :custom_fields, :custom_fields_trackers
+           :workflows
 
   def setup
     field_attributes = {:field_format => 'string', :is_for_all => true, :is_filter => true, :searchable => true, :trackers => Tracker.all}
@@ -59,7 +56,7 @@ class SearchCustomFieldsVisibilityTest < Redmine::ControllerTest
     }
 
     Member.where(:project_id => 1).each do |member|
-      member.destroy unless @users_to_test.key?(member.principal)
+      member.destroy unless @users_to_test.keys.include?(member.principal)
     end
   end
 
@@ -67,13 +64,13 @@ class SearchCustomFieldsVisibilityTest < Redmine::ControllerTest
     @users_to_test.each do |user, fields|
       @request.session[:user_id] = user.id
       @fields.each_with_index do |field, i|
-        get :index, :params => {:q => "value#{i}"}
+        get :index, :q => "value#{i}"
         assert_response :success
         # we should get a result only if the custom field is visible
         if fields.include?(field)
-          assert_select '#search-results dt', 1
+          assert_equal 1, assigns(:results).size
         else
-          assert_select '#search-results dt', 0
+          assert_equal 0, assigns(:results).size
         end
       end
     end

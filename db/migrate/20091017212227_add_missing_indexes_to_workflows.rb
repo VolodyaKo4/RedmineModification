@@ -1,4 +1,4 @@
-class AddMissingIndexesToWorkflows < ActiveRecord::Migration[4.2]
+class AddMissingIndexesToWorkflows < ActiveRecord::Migration
   def self.up
     add_index :workflows, :old_status_id
     add_index :workflows, :role_id

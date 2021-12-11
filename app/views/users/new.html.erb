@@ -1,9 +1,9 @@
 <%= title [l(:label_user_plural), users_path], l(:label_user_new) %>
 
-<%= labelled_form_for @user, :html => {:multipart => true} do |f| %>
+<%= labelled_form_for @user do |f| %>
   <%= render :partial => 'form', :locals => { :f => f } %>
   <% if email_delivery_enabled? %>
-  <p><label><%= check_box_tag 'send_information', 1, params[:send_information] %> <%= l(:label_send_information) %></label></p>
+  <p><label><%= check_box_tag 'send_information', 1, true %> <%= l(:label_send_information) %></label></p>
   <% end %>
   <p>
     <%= submit_tag l(:button_create) %>
@@ -20,7 +20,7 @@
         $('input#user_mail').val(ui.item.mail);
         $('select#user_auth_source_id option').each(function(){
           if ($(this).attr('value') == ui.item.auth_source_id) {
-            $(this).prop('selected', true);
+            $(this).attr('selected', true);
             $('select#user_auth_source_id').trigger('change');
           }
         });

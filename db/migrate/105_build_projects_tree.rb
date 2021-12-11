@@ -1,4 +1,4 @@
-class BuildProjectsTree < ActiveRecord::Migration[4.2]
+class BuildProjectsTree < ActiveRecord::Migration
   def self.up
     Project.rebuild_tree!
   end

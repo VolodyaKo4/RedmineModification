@@ -1,4 +1,6 @@
-# frozen_string_literal: false
+if Rails.version < '3'
+  config.gem 'rack-openid', :lib => 'rack/openid', :version => '>=0.2.1'
+end
 
 require 'open_id_authentication'
 

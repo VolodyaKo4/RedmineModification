@@ -1,4 +1,4 @@
-class AddProjectsLftAndRgt < ActiveRecord::Migration[4.2]
+class AddProjectsLftAndRgt < ActiveRecord::Migration
   def self.up
     add_column :projects, :lft, :integer
     add_column :projects, :rgt, :integer

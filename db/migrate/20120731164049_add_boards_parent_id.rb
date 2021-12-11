@@ -1,4 +1,4 @@
-class AddBoardsParentId < ActiveRecord::Migration[4.2]
+class AddBoardsParentId < ActiveRecord::Migration
   def up
     add_column :boards, :parent_id, :integer
   end

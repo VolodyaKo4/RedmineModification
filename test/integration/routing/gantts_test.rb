@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,12 +17,25 @@
 
 require File.expand_path('../../../test_helper', __FILE__)
 
-class RoutingGanttsTest < Redmine::RoutingTest
+class RoutingGanttsTest < ActionController::IntegrationTest
   def test_gantts
-    should_route 'GET /issues/gantt' => 'gantts#show'
-    should_route 'GET /issues/gantt.pdf' => 'gantts#show', :format => 'pdf'
-
-    should_route 'GET /projects/foo/issues/gantt' => 'gantts#show', :project_id => 'foo'
-    should_route 'GET /projects/foo/issues/gantt.pdf' => 'gantts#show', :project_id => 'foo', :format => 'pdf'
+    assert_routing(
+        { :method => 'get', :path => "/issues/gantt" },
+        { :controller => 'gantts', :action => 'show' }
+      )
+    assert_routing(
+        { :method => 'get', :path => "/issues/gantt.pdf" },
+        { :controller => 'gantts', :action => 'show', :format => 'pdf' }
+      )
+    assert_routing(
+        { :method => 'get', :path => "/projects/project-name/issues/gantt" },
+        { :controller => 'gantts', :action => 'show',
+          :project_id => 'project-name' }
+      )
+    assert_routing(
+        { :method => 'get', :path => "/projects/project-name/issues/gantt.pdf" },
+        { :controller => 'gantts', :action => 'show',
+          :project_id => 'project-name', :format => 'pdf' }
+      )
   end
 end

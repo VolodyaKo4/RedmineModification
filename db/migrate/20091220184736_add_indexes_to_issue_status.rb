@@ -1,4 +1,4 @@
-class AddIndexesToIssueStatus < ActiveRecord::Migration[4.2]
+class AddIndexesToIssueStatus < ActiveRecord::Migration
   def self.up
     add_index :issue_statuses, :position
     add_index :issue_statuses, :is_closed

@@ -1,4 +1,4 @@
-class AddMissingIndexesToTokens < ActiveRecord::Migration[4.2]
+class AddMissingIndexesToTokens < ActiveRecord::Migration
   def self.up
     add_index :tokens, :user_id
   end

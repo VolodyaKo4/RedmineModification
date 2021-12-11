@@ -1,4 +1,4 @@
-class CreateCustomFieldsRoles < ActiveRecord::Migration[4.2]
+class CreateCustomFieldsRoles < ActiveRecord::Migration
   def self.up
     create_table :custom_fields_roles, :id => false do |t|
       t.column :custom_field_id, :integer, :null => false

@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,19 +17,46 @@
 
 require File.expand_path('../../../test_helper', __FILE__)
 
-class RoutingQueriesTest < Redmine::RoutingTest
+class RoutingQueriesTest < ActionController::IntegrationTest
   def test_queries
-    should_route 'GET /queries/new' => 'queries#new'
-    should_route 'POST /queries' => 'queries#create'
-    should_route 'GET /queries/filter' => 'queries#filter'
-
-    should_route 'GET /queries/1/edit' => 'queries#edit', :id => '1'
-    should_route 'PUT /queries/1' => 'queries#update', :id => '1'
-    should_route 'DELETE /queries/1' => 'queries#destroy', :id => '1'
+    assert_routing(
+        { :method => 'get', :path => "/queries.xml" },
+        { :controller => 'queries', :action => 'index', :format => 'xml' }
+      )
+    assert_routing(
+        { :method => 'get', :path => "/queries.json" },
+        { :controller => 'queries', :action => 'index', :format => 'json' }
+      )
+    assert_routing(
+        { :method => 'get', :path => "/queries/new" },
+        { :controller => 'queries', :action => 'new' }
+      )
+    assert_routing(
+        { :method => 'post', :path => "/queries" },
+        { :controller => 'queries', :action => 'create' }
+      )
+    assert_routing(
+        { :method => 'get', :path => "/queries/1/edit" },
+        { :controller => 'queries', :action => 'edit', :id => '1' }
+      )
+    assert_routing(
+        { :method => 'put', :path => "/queries/1" },
+        { :controller => 'queries', :action => 'update', :id => '1' }
+      )
+    assert_routing(
+        { :method => 'delete', :path => "/queries/1" },
+        { :controller => 'queries', :action => 'destroy', :id => '1' }
+      )
   end
 
   def test_queries_scoped_under_project
-    should_route 'GET /projects/foo/queries/new' => 'queries#new', :project_id => 'foo'
-    should_route 'POST /projects/foo/queries' => 'queries#create', :project_id => 'foo'
+    assert_routing(
+        { :method => 'get', :path => "/projects/redmine/queries/new" },
+        { :controller => 'queries', :action => 'new', :project_id => 'redmine' }
+      )
+    assert_routing(
+        { :method => 'post', :path => "/projects/redmine/queries" },
+        { :controller => 'queries', :action => 'create', :project_id => 'redmine' }
+      )
   end
 end

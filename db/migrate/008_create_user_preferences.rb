@@ -1,4 +1,4 @@
-class CreateUserPreferences < ActiveRecord::Migration[4.2]
+class CreateUserPreferences < ActiveRecord::Migration
   def self.up
     create_table :user_preferences do |t|
       t.column "user_id", :integer, :default => 0, :null => false

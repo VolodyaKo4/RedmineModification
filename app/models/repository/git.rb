@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 # Copyright (C) 2007  Patrick Aljord patcito@ŋmail.com
 #
 # This program is free software; you can redistribute it and/or
@@ -21,9 +19,8 @@
 require 'redmine/scm/adapters/git_adapter'
 
 class Repository::Git < Repository
+  attr_protected :root_url
   validates_presence_of :url
-
-  safe_attributes 'report_last_commit'
 
   def self.human_attribute_name(attribute_key_name, *args)
     attr_name = attribute_key_name.to_s
@@ -42,16 +39,14 @@ class Repository::Git < Repository
   end
 
   def report_last_commit
-    return false if extra_info.nil?
-
-    v = extra_info["extra_report_last_commit"]
-    return false if v.nil?
-
-    v.to_s != '0'
+    extra_report_last_commit
   end
 
-  def report_last_commit=(arg)
-    merge_extra_info "extra_report_last_commit" => arg
+  def extra_report_last_commit
+    return false if extra_info.nil?
+    v = extra_info["extra_report_last_commit"]
+    return false if v.nil?
+    v.to_s != '0'
   end
 
   def supports_directory_revisions?
@@ -86,20 +81,20 @@ class Repository::Git < Repository
 
   def default_branch
     scm.default_branch
-  rescue => e
+  rescue Exception => e
     logger.error "git: error during get default branch: #{e.message}"
     nil
   end
 
   def find_changeset_by_name(name)
     if name.present?
-      changesets.find_by(:revision => name.to_s) ||
+      changesets.where(:revision => name.to_s).first ||
         changesets.where('scmid LIKE ?', "#{name}%").first
     end
   end
 
   def scm_entries(path=nil, identifier=nil)
-    scm.entries(path, identifier, :report_last_commit => report_last_commit)
+    scm.entries(path, identifier, :report_last_commit => extra_report_last_commit)
   end
   protected :scm_entries
 
@@ -137,7 +132,7 @@ class Repository::Git < Repository
 
     h1 = extra_info || {}
     h  = h1.dup
-    repo_heads = scm_brs.map{|br| br.scmid}
+    repo_heads = scm_brs.map{ |br| br.scmid }
     h["heads"] ||= []
     prev_db_heads = h["heads"].dup
     if prev_db_heads.empty?
@@ -146,7 +141,7 @@ class Repository::Git < Repository
     return if prev_db_heads.sort == repo_heads.sort
 
     h["db_consistent"]  ||= {}
-    if ! changesets.exists?
+    if changesets.count == 0
       h["db_consistent"]["ordering"] = 1
       merge_extra_info(h)
       self.save
@@ -214,24 +209,23 @@ class Repository::Git < Repository
     end
     h["heads"] = repo_heads.dup
     merge_extra_info(h)
-    save(:validate => false)
+    self.save
   end
   private :save_revisions
 
   def save_revision(rev)
     parents = (rev.parents || []).collect{|rp| find_changeset_by_name(rp)}.compact
-    changeset =
-      Changeset.create(
-        :repository   => self,
-        :revision     => rev.identifier,
-        :scmid        => rev.scmid,
-        :committer    => rev.author,
-        :committed_on => rev.time,
-        :comments     => rev.message,
-        :parents      => parents
-      )
+    changeset = Changeset.create(
+              :repository   => self,
+              :revision     => rev.identifier,
+              :scmid        => rev.scmid,
+              :committer    => rev.author,
+              :committed_on => rev.time,
+              :comments     => rev.message,
+              :parents      => parents
+              )
     unless changeset.new_record?
-      rev.paths.each {|change| changeset.create_change(change)}
+      rev.paths.each { |change| changeset.create_change(change) }
     end
     changeset
   end
@@ -244,28 +238,20 @@ class Repository::Git < Repository
     h['branches'].map{|br, hs| hs['last_scmid']}
   end
 
-  def latest_changesets(path, rev, limit=10)
+  def latest_changesets(path,rev,limit=10)
     revisions = scm.revisions(path, nil, rev, :limit => limit, :all => false)
     return [] if revisions.nil? || revisions.empty?
-
-    changesets.where(:scmid => revisions.map {|c| c.scmid}).to_a
+    changesets.where(:scmid => revisions.map {|c| c.scmid}).all
   end
 
   def clear_extra_info_of_changesets
     return if extra_info.nil?
-
     v = extra_info["extra_report_last_commit"]
     write_attribute(:extra_info, nil)
     h = {}
     h["extra_report_last_commit"] = v
     merge_extra_info(h)
-    save(:validate => false)
+    self.save
   end
   private :clear_extra_info_of_changesets
-
-  def clear_changesets
-    super
-    clear_extra_info_of_changesets
-  end
-  private :clear_changesets
 end

@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,11 +17,9 @@
 
 require File.expand_path('../../test_helper', __FILE__)
 
-class FilesControllerTest < Redmine::ControllerTest
+class FilesControllerTest < ActionController::TestCase
   fixtures :projects, :trackers, :issue_statuses, :issues,
-           :enumerations, :users,
-           :email_addresses,
-           :issue_categories,
+           :enumerations, :users, :issue_categories,
            :projects_trackers,
            :roles,
            :member_roles,
@@ -39,64 +35,48 @@ class FilesControllerTest < Redmine::ControllerTest
   end
 
   def test_index
-    get(
-      :index,
-      :params => {
-        :project_id => 1
-      }
-    )
+    get :index, :project_id => 1
     assert_response :success
+    assert_template 'index'
+    assert_not_nil assigns(:containers)
 
     # file attached to the project
-    assert_select 'a[href=?]', '/attachments/download/8/project_file.zip', :text => 'project_file.zip'
+    assert_tag :a, :content => 'project_file.zip',
+                   :attributes => { :href => '/attachments/download/8/project_file.zip' }
 
     # file attached to a project's version
-    assert_select 'a[href=?]', '/attachments/download/9/version_file.zip', :text => 'version_file.zip'
+    assert_tag :a, :content => 'version_file.zip',
+                   :attributes => { :href => '/attachments/download/9/version_file.zip' }
   end
 
   def test_new
     @request.session[:user_id] = 2
-    get(
-      :new,
-      :params => {
-        :project_id => 1
-      }
-    )
+    get :new, :project_id => 1
     assert_response :success
-    assert_select 'select[name=?]', 'version_id'
+    assert_template 'new'
+
+    assert_tag 'select', :attributes => {:name => 'version_id'}
   end
 
   def test_new_without_versions
     Version.delete_all
     @request.session[:user_id] = 2
-    get(
-      :new,
-      :params => {
-        :project_id => 1
-      }
-    )
+    get :new, :project_id => 1
     assert_response :success
-    assert_select 'select[name=?]', 'version_id', 0
+    assert_template 'new'
+
+    assert_no_tag 'select', :attributes => {:name => 'version_id'}
   end
 
   def test_create_file
     set_tmp_attachments_directory
     @request.session[:user_id] = 2
     ActionMailer::Base.deliveries.clear
+
     with_settings :notified_events => %w(file_added) do
       assert_difference 'Attachment.count' do
-        post(
-          :create,
-          :params => {
-            :project_id => 1,
-            :version_id => '',
-            :attachments => {
-              '1' => {
-                'file' => uploaded_test_file('testfile.txt', 'text/plain')
-              }
-            }
-          }
-        )
+        post :create, :project_id => 1, :version_id => '',
+             :attachments => {'1' => {'file' => uploaded_test_file('testfile.txt', 'text/plain')}}
         assert_response :redirect
       end
     end
@@ -114,19 +94,10 @@ class FilesControllerTest < Redmine::ControllerTest
   def test_create_version_file
     set_tmp_attachments_directory
     @request.session[:user_id] = 2
+
     assert_difference 'Attachment.count' do
-      post(
-        :create,
-        :params => {
-          :project_id => 1,
-          :version_id => '2',
-          :attachments => {
-            '1' => {
-              'file' => uploaded_test_file('testfile.txt', 'text/plain')
-            }
-          }
-        }
-      )
+      post :create, :project_id => 1, :version_id => '2',
+           :attachments => {'1' => {'file' => uploaded_test_file('testfile.txt', 'text/plain')}}
       assert_response :redirect
     end
     assert_redirected_to '/projects/ecookbook/files'
@@ -135,19 +106,4 @@ class FilesControllerTest < Redmine::ControllerTest
     assert_equal Version.find(2), a.container
   end
 
-  def test_create_without_file
-    set_tmp_attachments_directory
-    @request.session[:user_id] = 2
-    assert_no_difference 'Attachment.count' do
-      post(
-        :create,
-        :params => {
-          :project_id => 1,
-          :version_id => ''
-        }
-      )
-      assert_response :success
-    end
-    assert_select 'div.error', 'File is invalid'
-  end
 end

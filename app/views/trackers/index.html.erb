@@ -5,30 +5,28 @@
 
 <h2><%=l(:label_tracker_plural)%></h2>
 
-<table class="list trackers">
+<table class="list">
   <thead><tr>
   <th><%=l(:label_tracker)%></th>
-  <th><%=l(:field_default_status)%></th>
-  <th><%=l(:field_description)%></th>
   <th></th>
+  <th><%=l(:button_sort)%></th>
   <th></th>
   </tr></thead>
   <tbody>
 <% for tracker in @trackers %>
-  <tr>
-  <td class="name"><%= link_to tracker.name, edit_tracker_path(tracker) %></td>
-  <td><%= tracker.default_status.name %></td>
-  <td class="description"><%= tracker.description %></td>
+  <tr class="<%= cycle("odd", "even") %>">
+  <td class="name"><%= link_to h(tracker.name), edit_tracker_path(tracker) %></td>
   <td>
-    <% unless tracker.workflow_rules.exists? %>
+    <% unless tracker.workflow_rules.count > 0 %>
       <span class="icon icon-warning">
         <%= l(:text_tracker_no_workflow) %> (<%= link_to l(:button_edit), workflows_edit_path(:tracker_id => tracker) %>)
       </span>
     <% end %>
   </td>
+  <td class="reorder">
+    <%= reorder_links('tracker', {:action => 'update', :id => tracker}, :put) %>
+  </td>
   <td class="buttons">
-    <%= reorder_handle(tracker) %>
-    <%= link_to l(:button_copy), new_tracker_path(:copy => tracker), :class => 'icon icon-copy' %>
     <%= delete_link tracker_path(tracker) %>
   </td>
   </tr>
@@ -36,8 +34,6 @@
   </tbody>
 </table>
 
-<% html_title(l(:label_tracker_plural)) -%>
+<p class="pagination"><%= pagination_links_full @tracker_pages %></p>
 
-<%= javascript_tag do %>
-  $(function() { $("table.trackers tbody").positionedItems(); });
-<% end %>
+<% html_title(l(:label_tracker_plural)) -%>

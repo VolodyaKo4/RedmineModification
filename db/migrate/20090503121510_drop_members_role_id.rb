@@ -1,4 +1,4 @@
-class DropMembersRoleId < ActiveRecord::Migration[4.2]
+class DropMembersRoleId < ActiveRecord::Migration
   def self.up
     remove_column :members, :role_id
   end

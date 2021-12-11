@@ -1,4 +1,4 @@
-class SetCustomFieldsEditable < ActiveRecord::Migration[4.2]
+class SetCustomFieldsEditable < ActiveRecord::Migration
   def self.up
     UserCustomField.update_all("editable = #{CustomField.connection.quoted_false}")
   end

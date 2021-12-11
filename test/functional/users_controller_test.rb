@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,15 +17,12 @@
 
 require File.expand_path('../../test_helper', __FILE__)
 
-class UsersControllerTest < Redmine::ControllerTest
+class UsersControllerTest < ActionController::TestCase
   include Redmine::I18n
 
-  fixtures :users, :user_preferences, :email_addresses, :projects, :members, :member_roles, :roles,
+  fixtures :users, :projects, :members, :member_roles, :roles,
            :custom_fields, :custom_values, :groups_users,
-           :auth_sources,
-           :enabled_modules,
-           :issues, :issue_statuses,
-           :trackers
+           :auth_sources
 
   def setup
     User.current = nil
@@ -37,131 +32,61 @@ class UsersControllerTest < Redmine::ControllerTest
   def test_index
     get :index
     assert_response :success
-    assert_select 'table.users'
-    assert_select 'tr.user.active'
-    assert_select 'tr.user.locked', 0
+    assert_template 'index'
+    assert_not_nil assigns(:users)
+    # active users only
+    assert_nil assigns(:users).detect {|u| !u.active?}
   end
 
   def test_index_with_status_filter
-    get :index, :params => {:status => 3}
+    get :index, :status => 3
     assert_response :success
-    assert_select 'tr.user.active', 0
-    assert_select 'tr.user.locked'
+    assert_template 'index'
+    assert_not_nil assigns(:users)
+    assert_equal [3], assigns(:users).map(&:status).uniq
   end
 
   def test_index_with_name_filter
-    get :index, :params => {:name => 'john'}
+    get :index, :name => 'john'
     assert_response :success
-    assert_select 'tr.user td.username', :text => 'jsmith'
-    assert_select 'tr.user', 1
+    assert_template 'index'
+    users = assigns(:users)
+    assert_not_nil users
+    assert_equal 1, users.size
+    assert_equal 'John', users.first.firstname
   end
 
   def test_index_with_group_filter
-    get :index, :params => {:group_id => '10'}
+    get :index, :group_id => '10'
     assert_response :success
-
-    assert_select 'tr.user', Group.find(10).users.count
+    assert_template 'index'
+    users = assigns(:users)
+    assert users.any?
+    assert_equal([], (users - Group.find(10).users))
     assert_select 'select[name=group_id]' do
-      assert_select 'option[value="10"][selected=selected]'
+      assert_select 'option[value=10][selected=selected]'
     end
-  end
-
-  def test_index_csv
-    with_settings :default_language => 'en' do
-      user = User.logged.status(1).first
-      user.update(passwd_changed_on: Time.current.last_month, twofa_scheme: 'totp')
-      get :index, params: {format: 'csv'}
-      assert_response :success
-
-      assert_equal User.logged.status(1).count, response.body.chomp.split("\n").size - 1
-      assert_include format_time(user.updated_on), response.body.split("\n").second
-      assert_include format_time(user.passwd_changed_on), response.body.split("\n").second
-
-      # status
-      assert_include 'active', response.body.split("\n").second
-      assert_not_include 'locked', response.body.split("\n").second
-
-      # twofa_scheme
-      assert_include 'Authenticator app', response.body.split("\n").second
-      assert_include 'disabled', response.body.split("\n").third
-
-      assert_equal 'text/csv', @response.media_type
-    end
-  end
-
-  def test_index_csv_with_custom_field_columns
-    float_custom_field = UserCustomField.generate!(:name => 'float field', :field_format => 'float')
-    date_custom_field = UserCustomField.generate!(:name => 'date field', :field_format => 'date')
-    user = User.last
-    user.custom_field_values = {float_custom_field.id.to_s => 2.1, date_custom_field.id.to_s => '2020-01-10'}
-    user.save
-
-    User.find(@request.session[:user_id]).update(:language => nil)
-    with_settings :default_language => 'fr' do
-      get :index, :params => {:name => user.lastname, :format => 'csv'}
-      assert_response :success
-
-      assert_include 'float field;date field', response.body
-      assert_include '2,10;10/01/2020', response.body
-      assert_equal 'text/csv', @response.media_type
-    end
-  end
-
-  def test_index_csv_with_status_filter
-    with_settings :default_language => 'en' do
-      get :index, :params => {:status => 3, :format => 'csv'}
-      assert_response :success
-
-      assert_equal User.logged.status(3).count, response.body.chomp.split("\n").size - 1
-      assert_include 'locked', response.body
-      assert_not_include 'active', response.body
-      assert_equal 'text/csv', @response.media_type
-    end
-  end
-
-  def test_index_csv_with_name_filter
-    get :index, :params => {:name => 'John', :format => 'csv'}
-    assert_response :success
-
-    assert_equal User.logged.like('John').count, response.body.chomp.split("\n").size - 1
-    assert_include 'John', response.body
-    assert_equal 'text/csv', @response.media_type
-  end
-
-  def test_index_csv_with_group_filter
-    get :index, :params => {:group_id => '10', :format => 'csv'}
-    assert_response :success
-
-    assert_equal Group.find(10).users.count, response.body.chomp.split("\n").size - 1
-    assert_equal 'text/csv', @response.media_type
   end
 
   def test_show
     @request.session[:user_id] = nil
-    get :show, :params => {:id => 2}
+    get :show, :id => 2
     assert_response :success
-    assert_select 'h2', :text => /John Smith/
+    assert_template 'show'
+    assert_not_nil assigns(:user)
 
-    # groups block should not be rendeder for users which are not part of any group
-    assert_select 'div#groups', 0
-  end
-
-  def test_show_should_display_visible_custom_fields
-    @request.session[:user_id] = nil
-    UserCustomField.find_by_name('Phone number').update_attribute :visible, true
-    get :show, :params => {:id => 2}
-    assert_response :success
-
-    assert_select 'li.cf_4.string_cf', :text => /Phone number/
+    assert_tag 'li', :content => /Phone number/
   end
 
   def test_show_should_not_display_hidden_custom_fields
     @request.session[:user_id] = nil
     UserCustomField.find_by_name('Phone number').update_attribute :visible, false
-    get :show, :params => {:id => 2}
+    get :show, :id => 2
     assert_response :success
+    assert_template 'show'
+    assert_not_nil assigns(:user)
 
-    assert_select 'li', :text => /Phone number/, :count => 0
+    assert_no_tag 'li', :content => /Phone number/
   end
 
   def test_show_should_not_fail_when_custom_values_are_nil
@@ -171,138 +96,76 @@ class UsersControllerTest < Redmine::ControllerTest
     custom_field = CustomField.create!(:name => 'Testing', :field_format => 'text')
     custom_value = user.custom_values.build(:custom_field => custom_field).save!
 
-    get :show, :params => {:id => 2}
+    get :show, :id => 2
     assert_response :success
   end
 
   def test_show_inactive
     @request.session[:user_id] = nil
-    get :show, :params => {:id => 5}
+    get :show, :id => 5
+    assert_response 404
+  end
+
+  def test_show_should_not_reveal_users_with_no_visible_activity_or_project
+    @request.session[:user_id] = nil
+    get :show, :id => 9
     assert_response 404
   end
 
   def test_show_inactive_by_admin
     @request.session[:user_id] = 1
-    get :show, :params => {:id => 5}
+    get :show, :id => 5
     assert_response 200
-    assert_select 'h2', :text => /Dave2 Lopper2/
-  end
-
-  def test_show_user_who_is_not_visible_should_return_404
-    Role.anonymous.update! :users_visibility => 'members_of_visible_projects'
-    user = User.generate!
-
-    @request.session[:user_id] = nil
-    get :show, :params => {:id => user.id}
-    assert_response 404
+    assert_not_nil assigns(:user)
   end
 
   def test_show_displays_memberships_based_on_project_visibility
     @request.session[:user_id] = 1
-    get :show, :params => {:id => 2}
+    get :show, :id => 2
     assert_response :success
-
-    assert_select 'table.list.projects>tbody' do
-      assert_select 'tr:nth-of-type(1)' do
-        assert_select 'td:nth-of-type(1)>span>a', :text => 'eCookbook'
-        assert_select 'td:nth-of-type(2)', :text => 'Manager'
-      end
-      assert_select 'tr:nth-of-type(2)' do
-        assert_select 'td:nth-of-type(1)>span>a', :text => 'Private child of eCookbook'
-        assert_select 'td:nth-of-type(2)', :text => 'Manager'
-      end
-      assert_select 'tr:nth-of-type(3)' do
-        assert_select 'td:nth-of-type(1)>span>a', :text => 'OnlineStore'
-        assert_select 'td:nth-of-type(2)', :text => 'Developer'
-      end
-    end
+    memberships = assigns(:memberships)
+    assert_not_nil memberships
+    project_ids = memberships.map(&:project_id)
+    assert project_ids.include?(2) #private project admin can see
   end
 
   def test_show_current_should_require_authentication
     @request.session[:user_id] = nil
-    get :show, :params => {:id => 'current'}
+    get :show, :id => 'current'
     assert_response 302
   end
 
   def test_show_current
     @request.session[:user_id] = 2
-    get :show, :params => {:id => 'current'}
+    get :show, :id => 'current'
     assert_response :success
-    assert_select 'h2', :text => /John Smith/
-  end
-
-  def test_show_issues_counts
-    @request.session[:user_id] = 2
-    get :show, :params => {:id => 2}
-    assert_select 'table.list.issue-report>tbody' do
-      assert_select 'tr:nth-of-type(1)' do
-        assert_select 'td:nth-of-type(1)>a', :text => 'Assigned issues'
-        assert_select 'td:nth-of-type(2)>a', :text => '1'   # open
-        assert_select 'td:nth-of-type(3)>a', :text => '0'   # closed
-        assert_select 'td:nth-of-type(4)>a', :text => '1'   # total
-      end
-      assert_select 'tr:nth-of-type(2)' do
-        assert_select 'td:nth-of-type(1)>a', :text => 'Reported issues'
-        assert_select 'td:nth-of-type(2)>a', :text => '11'  # open
-        assert_select 'td:nth-of-type(3)>a', :text => '2'   # closed
-        assert_select 'td:nth-of-type(4)>a', :text => '13'  # total
-      end
-    end
-  end
-
-  def test_show_user_should_list_user_groups
-    @request.session[:user_id] = 1
-    get :show, :params => {:id => 8}
-
-    assert_select 'div#groups', 1 do
-      assert_select 'h3', :text => 'Groups'
-      assert_select 'li', 2
-      assert_select 'a[href=?]', '/groups/10/edit', :text => 'A Team'
-      assert_select 'a[href=?]', '/groups/11/edit', :text => 'B Team'
-    end
-  end
-
-  def test_show_should_list_all_emails
-    EmailAddress.create!(user_id: 3, address: 'dlopper@example.net')
-    EmailAddress.create!(user_id: 3, address: 'dlopper@example.org')
-
-    @request.session[:user_id] = 1
-    get :show, params: {id: 3}
-
-    assert_select 'li', text: /Email:/ do
-      assert_select 'a:nth-of-type(1)', text: 'dlopper@somenet.foo'
-      assert_select 'a:nth-of-type(2)', text: 'dlopper@example.net'
-      assert_select 'a:nth-of-type(3)', text: 'dlopper@example.org'
-    end
+    assert_template 'show'
+    assert_equal User.find(2), assigns(:user)
   end
 
   def test_new
     get :new
     assert_response :success
-    assert_select 'input[name=?]', 'user[login]'
-    assert_select 'label[for=?]>span.required', 'user_password', 1
+    assert_template :new
+    assert assigns(:user)
   end
 
   def test_create
-    with_settings :bcc_recipients => '1' do
-      assert_difference 'User.count' do
-        assert_difference 'ActionMailer::Base.deliveries.size' do
-          post(
-            :create,
-            :params => {
-              :user => {
-                :firstname => 'John',
-                :lastname => 'Doe',
-                :login => 'jdoe',
-                :password => 'secret123',
-                :password_confirmation => 'secret123',
-                :mail => 'jdoe@gmail.com',
-                :mail_notification => 'none'
-              },
-              :send_information => '1'
-            }
-          )
-        end
+    Setting.bcc_recipients = '1'
+
+    assert_difference 'User.count' do
+      assert_difference 'ActionMailer::Base.deliveries.size' do
+        post :create,
+          :user => {
+            :firstname => 'John',
+            :lastname => 'Doe',
+            :login => 'jdoe',
+            :password => 'secret123',
+            :password_confirmation => 'secret123',
+            :mail => 'jdoe@gmail.com',
+            :mail_notification => 'none'
+          },
+          :send_information => '1'
       end
     end
 
@@ -324,7 +187,7 @@ class UsersControllerTest < Redmine::ControllerTest
 
   def test_create_with_preferences
     assert_difference 'User.count' do
-      post :create, :params => {
+      post :create,
         :user => {
           :firstname => 'John',
           :lastname => 'Doe',
@@ -338,11 +201,8 @@ class UsersControllerTest < Redmine::ControllerTest
           'hide_mail' => '1',
           'time_zone' => 'Paris',
           'comments_sorting' => 'desc',
-          'warn_on_leaving_unsaved' => '0',
-          'textarea_font' => 'proportional',
-          'history_default_tab' => 'history'
+          'warn_on_leaving_unsaved' => '0'
         }
-      }
     end
     user = User.order('id DESC').first
     assert_equal 'jdoe', user.login
@@ -350,25 +210,20 @@ class UsersControllerTest < Redmine::ControllerTest
     assert_equal 'Paris', user.pref.time_zone
     assert_equal 'desc', user.pref[:comments_sorting]
     assert_equal '0', user.pref[:warn_on_leaving_unsaved]
-    assert_equal 'proportional', user.pref[:textarea_font]
-    assert_equal 'history', user.pref[:history_default_tab]
   end
 
   def test_create_with_generate_password_should_email_the_password
     assert_difference 'User.count' do
-      post :create, :params => {
-        :user => {
-          :login => 'randompass',
-          :firstname => 'Random',
-          :lastname => 'Pass',
-          :mail => 'randompass@example.net',
-          :language => 'en',
-          :generate_password => '1',
-          :password => '',
-          :password_confirmation => ''
-        },
-        :send_information => 1
-      }
+      post :create, :user => {
+        :login => 'randompass',
+        :firstname => 'Random',
+        :lastname => 'Pass',
+        :mail => 'randompass@example.net',
+        :language => 'en',
+        :generate_password => '1',
+        :password => '',
+        :password_confirmation => ''
+      }, :send_information => 1
     end
     user = User.order('id DESC').first
     assert_equal 'randompass', user.login
@@ -381,34 +236,18 @@ class UsersControllerTest < Redmine::ControllerTest
     assert user.check_password?(password)
   end
 
-  def test_create_and_continue
-    post :create, :params => {
-      :user => {
-        :login => 'randompass',
-        :firstname => 'Random',
-        :lastname => 'Pass',
-        :mail => 'randompass@example.net',
-        :generate_password => '1'
-      },
-      :continue => '1'
-    }
-    assert_redirected_to '/users/new?user%5Bgenerate_password%5D=1'
-  end
-
   def test_create_with_failure
     assert_no_difference 'User.count' do
-      post :create, :params => {:user => {:login => 'foo'}}
+      post :create, :user => {}
     end
     assert_response :success
-    assert_select_error /Email cannot be blank/
+    assert_template 'new'
   end
 
   def test_create_with_failure_sould_preserve_preference
     assert_no_difference 'User.count' do
-      post :create, :params => {
-        :user => {
-          :login => 'foo'
-        },
+      post :create,
+        :user => {},
         :pref => {
           'no_self_notified' => '1',
           'hide_mail' => '1',
@@ -416,107 +255,26 @@ class UsersControllerTest < Redmine::ControllerTest
           'comments_sorting' => 'desc',
           'warn_on_leaving_unsaved' => '0'
         }
-      }
     end
     assert_response :success
+    assert_template 'new'
 
     assert_select 'select#pref_time_zone option[selected=selected]', :text => /Paris/
-    assert_select 'input#pref_no_self_notified[value="1"][checked=checked]'
-  end
-
-  def test_create_admin_should_send_security_notification
-    ActionMailer::Base.deliveries.clear
-    post :create, :params => {
-      :user => {
-        :firstname => 'Edgar',
-        :lastname => 'Schmoe',
-        :login => 'eschmoe',
-        :password => 'secret123',
-        :password_confirmation => 'secret123',
-        :mail => 'eschmoe@example.foo',
-        :admin => '1'
-      }
-    }
-
-    assert_not_nil (mail = ActionMailer::Base.deliveries.last)
-    assert_mail_body_match '0.0.0.0', mail
-    assert_mail_body_match(
-      I18n.t(
-        :mail_body_security_notification_add,
-        field: I18n.t(:field_admin),
-        value: 'eschmoe'
-      ),
-      mail
-    )
-    assert_select_email do
-      assert_select 'a[href^=?]', 'http://localhost:3000/users', :text => 'Users'
-    end
-
-    # All admins should receive this
-    User.where(admin: true, status: Principal::STATUS_ACTIVE).each do |admin|
-      assert_not_nil(
-        ActionMailer::Base.deliveries.detect do |mail|
-          [mail.bcc, mail.cc].flatten.include?(admin.mail)
-        end
-      )
-    end
-  end
-
-  def test_create_non_admin_should_not_send_security_notification
-    ActionMailer::Base.deliveries.clear
-    post :create, :params => {
-      :user => {
-        :firstname => 'Edgar',
-        :lastname => 'Schmoe',
-        :login => 'eschmoe',
-        :password => 'secret123',
-        :password_confirmation => 'secret123',
-        :mail => 'eschmoe@example.foo',
-        :admin => '0'
-      }
-    }
-    assert_nil ActionMailer::Base.deliveries.last
+    assert_select 'input#pref_no_self_notified[value=1][checked=checked]'
   end
 
   def test_edit
-    with_settings :gravatar_enabled => '1' do
-      get :edit, :params => {:id => 2}
-    end
+    get :edit, :id => 2
     assert_response :success
-    assert_select 'h2>a+img.gravatar'
-    assert_select 'input[name=?][value=?]', 'user[login]', 'jsmith'
-    assert_select 'label[for=?]>span.required', 'user_password', 0
-  end
-
-  def test_edit_registered_user
-    assert User.find(2).register!
-
-    get :edit, :params => {:id => 2}
-    assert_response :success
-    assert_select 'a', :text => 'Activate'
-  end
-
-  def test_edit_should_be_denied_for_anonymous
-    assert User.find(6).anonymous?
-    get :edit, :params => {:id => 6}
-    assert_response 404
-  end
-
-  def test_edit_user_with_full_text_formatting_custom_field_should_not_fail
-    field = UserCustomField.find(4)
-    field.update_attribute :text_formatting, 'full'
-
-    get :edit, :params => {:id => 2}
-    assert_response :success
+    assert_template 'edit'
+    assert_equal User.find(2), assigns(:user)
   end
 
   def test_update
     ActionMailer::Base.deliveries.clear
-    put :update, :params => {
-      :id => 2,
-      :user => {:firstname => 'Changed', :mail_notification => 'only_assigned'},
-      :pref => {:hide_mail => '1', :comments_sorting => 'desc'}
-    }
+    put :update, :id => 2,
+        :user => {:firstname => 'Changed', :mail_notification => 'only_assigned'},
+        :pref => {:hide_mail => '1', :comments_sorting => 'desc'}
     user = User.find(2)
     assert_equal 'Changed', user.firstname
     assert_equal 'only_assigned', user.mail_notification
@@ -527,40 +285,27 @@ class UsersControllerTest < Redmine::ControllerTest
 
   def test_update_with_failure
     assert_no_difference 'User.count' do
-      put :update, :params => {
-        :id => 2,
-        :user => {:firstname => ''}
-      }
+      put :update, :id => 2, :user => {:firstname => ''}
     end
     assert_response :success
-    assert_select_error /First name cannot be blank/
+    assert_template 'edit'
   end
 
   def test_update_with_group_ids_should_assign_groups
-    put :update, :params => {
-      :id => 2,
-      :user => {:group_ids => ['10']}
-    }
+    put :update, :id => 2, :user => {:group_ids => ['10']}
     user = User.find(2)
     assert_equal [10], user.group_ids
   end
 
   def test_update_with_activation_should_send_a_notification
-    u = User.new(:firstname => 'Foo', :lastname => 'Bar',
-                 :mail => 'foo.bar@somenet.foo', :language => 'fr')
+    u = User.new(:firstname => 'Foo', :lastname => 'Bar', :mail => 'foo.bar@somenet.foo', :language => 'fr')
     u.login = 'foo'
     u.status = User::STATUS_REGISTERED
     u.save!
     ActionMailer::Base.deliveries.clear
-    with_settings :bcc_recipients => '1' do
-      put(
-        :update,
-        :params => {
-          :id => u.id,
-          :user => {:status => User::STATUS_ACTIVE}
-        }
-      )
-    end
+    Setting.bcc_recipients = '1'
+
+    put :update, :id => u.id, :user => {:status => User::STATUS_ACTIVE}
     assert u.reload.active?
     mail = ActionMailer::Base.deliveries.last
     assert_not_nil mail
@@ -570,19 +315,9 @@ class UsersControllerTest < Redmine::ControllerTest
 
   def test_update_with_password_change_should_send_a_notification
     ActionMailer::Base.deliveries.clear
-    with_settings :bcc_recipients => '1' do
-      put(
-        :update,
-        :params => {
-          :id => 2,
-          :user => {
-            :password => 'newpass123',
-            :password_confirmation => 'newpass123'
-          },
-         :send_information => '1'
-        }
-      )
-    end
+    Setting.bcc_recipients = '1'
+
+    put :update, :id => 2, :user => {:password => 'newpass123', :password_confirmation => 'newpass123'}, :send_information => '1'
     u = User.find(2)
     assert u.check_password?('newpass123')
 
@@ -594,40 +329,29 @@ class UsersControllerTest < Redmine::ControllerTest
 
   def test_update_with_generate_password_should_email_the_password
     ActionMailer::Base.deliveries.clear
-    with_settings :bcc_recipients => '1' do
-      put(
-        :update,
-        :params => {
-          :id => 2,
-          :user => {
-            :generate_password => '1',
-            :password => '',
-            :password_confirmation => ''
-          },
-          :send_information => '1'
-        }
-      )
-    end
+    Setting.bcc_recipients = '1'
+
+    put :update, :id => 2, :user => {
+      :generate_password => '1',
+      :password => '',
+      :password_confirmation => ''
+    }, :send_information => '1'
+
     mail = ActionMailer::Base.deliveries.last
     assert_not_nil mail
-    u = User.find(2)
-    assert_equal [u.mail], mail.bcc
     m = mail_body(mail).match(/Password: ([a-zA-Z0-9]+)/)
     assert m
     password = m[1]
-    assert u.check_password?(password)
+    assert User.find(2).check_password?(password)
   end
 
   def test_update_without_generate_password_should_not_change_password
-    put :update, :params => {
-      :id => 2, :user => {
-        :firstname => 'changed',
-        :generate_password => '0',
-        :password => '',
-        :password_confirmation => ''
-      },
-      :send_information => '1'
-    }
+    put :update, :id => 2, :user => {
+      :firstname => 'changed',
+      :generate_password => '0',
+      :password => '',
+      :password_confirmation => ''
+    }, :send_information => '1'
 
     user = User.find(2)
     assert_equal 'changed', user.firstname
@@ -640,30 +364,26 @@ class UsersControllerTest < Redmine::ControllerTest
     u.auth_source = AuthSource.find(1)
     u.save!
 
-    put :update, :params => {
-      :id => u.id,
-      :user => {:auth_source_id => '', :password => 'newpass123', :password_confirmation => 'newpass123'}
-    }
+    put :update, :id => u.id, :user => {:auth_source_id => '', :password => 'newpass123', :password_confirmation => 'newpass123'}
 
-    assert_nil u.reload.auth_source
+    assert_equal nil, u.reload.auth_source
     assert u.check_password?('newpass123')
   end
 
   def test_update_notified_project
-    get :edit, :params => {:id => 2}
+    get :edit, :id => 2
     assert_response :success
+    assert_template 'edit'
     u = User.find(2)
     assert_equal [1, 2, 5], u.projects.collect{|p| p.id}.sort
     assert_equal [1, 2, 5], u.notified_projects_ids.sort
     assert_select 'input[name=?][value=?]', 'user[notified_project_ids][]', '1'
     assert_equal 'all', u.mail_notification
-    put :update, :params => {
-      :id => 2,
-      :user => {
-        :mail_notification => 'selected',
-        :notified_project_ids => [1, 2]
-      }
-    }
+    put :update, :id => 2,
+        :user => {
+          :mail_notification => 'selected',
+          :notified_project_ids => [1, 2]
+        }
     u = User.find(2)
     assert_equal 'selected', u.mail_notification
     assert_equal [1, 2], u.notified_projects_ids.sort
@@ -674,270 +394,108 @@ class UsersControllerTest < Redmine::ControllerTest
     user.pref[:no_self_notified] = '1'
     user.pref.save
 
-    put :update, :params => {
-      :id => 2,
-      :user => {:status => 3}
-    }
+    put :update, :id => 2, :user => {:status => 3}
     assert_response 302
     user = User.find(2)
     assert_equal 3, user.status
     assert_equal '1', user.pref[:no_self_notified]
   end
 
-  def test_update_assign_admin_should_send_security_notification
-    ActionMailer::Base.deliveries.clear
-    put :update, :params => {
-      :id => 2,
-      :user => {:admin => 1}
-    }
-
-    assert_not_nil (mail = ActionMailer::Base.deliveries.last)
-    assert_mail_body_match(
-      I18n.t(
-        :mail_body_security_notification_add,
-        field: I18n.t(:field_admin),
-        value: User.find(2).login
-      ),
-      mail
-    )
-    # All admins should receive this
-    User.where(admin: true, status: Principal::STATUS_ACTIVE).each do |admin|
-      assert_not_nil(
-        ActionMailer::Base.deliveries.detect do |mail|
-          [mail.bcc, mail.cc].flatten.include?(admin.mail)
-        end
-      )
-    end
-  end
-
-  def test_update_unassign_admin_should_send_security_notification
-    user = User.find(2)
-    user.admin = true
-    user.save!
-
-    ActionMailer::Base.deliveries.clear
-    put :update, :params => {
-      :id => user.id,
-      :user => {:admin => 0}
-    }
-
-    assert_not_nil (mail = ActionMailer::Base.deliveries.last)
-    assert_mail_body_match(
-      I18n.t(
-        :mail_body_security_notification_remove,
-        field: I18n.t(:field_admin),
-        value: user.login
-      ),
-      mail
-    )
-    # All admins should receive this
-    User.where(admin: true, status: Principal::STATUS_ACTIVE).each do |admin|
-      assert_not_nil(
-        ActionMailer::Base.deliveries.detect do |mail|
-          [mail.bcc, mail.cc].flatten.include?(admin.mail)
-        end
-      )
-    end
-  end
-
-  def test_update_lock_admin_should_send_security_notification
-    user = User.find(2)
-    user.admin = true
-    user.save!
-
-    ActionMailer::Base.deliveries.clear
-    put :update, :params => {
-      :id => 2,
-      :user => {:status => Principal::STATUS_LOCKED}
-    }
-
-    assert_not_nil (mail = ActionMailer::Base.deliveries.last)
-    assert_mail_body_match(
-      I18n.t(
-        :mail_body_security_notification_remove,
-        field: I18n.t(:field_admin),
-        value: User.find(2).login
-      ),
-      mail
-    )
-    # All admins should receive this
-    User.where(admin: true, status: Principal::STATUS_ACTIVE).each do |admin|
-      assert_not_nil(
-        ActionMailer::Base.deliveries.detect do |mail|
-          [mail.bcc, mail.cc].flatten.include?(admin.mail)
-        end
-      )
-    end
-
-    # if user is already locked, destroying should not send a second mail
-    # (for active admins see furtherbelow)
-    ActionMailer::Base.deliveries.clear
-    delete :destroy, :params => {:id => 1, :confirm => User.find(1).login}
-    assert_nil ActionMailer::Base.deliveries.last
-
-  end
-
-  def test_update_unlock_admin_should_send_security_notification
-    user = User.find(5) # already locked
-    user.admin = true
-    user.save!
-    ActionMailer::Base.deliveries.clear
-    put :update, :params => {
-      :id => user.id,
-      :user => {:status => Principal::STATUS_ACTIVE}
-    }
-
-    assert_not_nil (mail = ActionMailer::Base.deliveries.last)
-    assert_mail_body_match(
-      I18n.t(
-        :mail_body_security_notification_add,
-        field: I18n.t(:field_admin),
-        value: user.login
-      ),
-      mail
-    )
-    # All admins should receive this
-    User.where(admin: true, status: Principal::STATUS_ACTIVE).each do |admin|
-      assert_not_nil(
-        ActionMailer::Base.deliveries.detect do |mail|
-          [mail.bcc, mail.cc].flatten.include?(admin.mail)
-        end
-      )
-    end
-  end
-
-  def test_update_admin_unrelated_property_should_not_send_security_notification
-    ActionMailer::Base.deliveries.clear
-    put :update, :params => {
-      :id => 1,
-      :user => {:firstname => 'Jimmy'}
-    }
-    assert_nil ActionMailer::Base.deliveries.last
-  end
-
-  def test_update_should_be_denied_for_anonymous
-    assert User.find(6).anonymous?
-    put :update, :params => {:id => 6}
-    assert_response 404
-  end
-
-  def test_update_with_blank_email_should_not_raise_exception
-    assert_no_difference 'User.count' do
-      with_settings :gravatar_enabled => '1' do
-        put :update, :params => {
-          :id => 2,
-          :user => {:mail => ''}
-        }
-      end
-    end
-    assert_response :success
-    assert_select_error /Email cannot be blank/
-  end
-
   def test_destroy
     assert_difference 'User.count', -1 do
-      delete :destroy, :params => {:id => 2, :confirm => User.find(2).login}
+      delete :destroy, :id => 2
     end
     assert_redirected_to '/users'
     assert_nil User.find_by_id(2)
-  end
-
-  def test_destroy_with_lock_param_should_lock_instead
-    assert_no_difference 'User.count' do
-      delete :destroy, :params => {:id => 2, :lock => 'lock'}
-    end
-    assert_redirected_to '/users'
-    assert User.find_by_id(2).locked?
-  end
-
-  def test_destroy_should_require_confirmation
-    assert_no_difference 'User.count' do
-      delete :destroy, :params => {:id => 2}
-    end
-    assert_response :success
-    assert_select '.warning', :text => /Are you sure you want to delete this user/
-  end
-
-  def test_destroy_should_require_correct_confirmation
-    assert_no_difference 'User.count' do
-      delete :destroy, :params => {:id => 2, :confirm => 'wrong'}
-    end
-    assert_response :success
-    assert_select '.warning', :text => /Are you sure you want to delete this user/
   end
 
   def test_destroy_should_be_denied_for_non_admin_users
     @request.session[:user_id] = 3
 
     assert_no_difference 'User.count' do
-      delete :destroy, :params => {:id => 2, :confirm => User.find(2).login}
+      get :destroy, :id => 2
     end
     assert_response 403
   end
 
-  def test_destroy_should_be_denied_for_anonymous
-    assert User.find(6).anonymous?
-    assert_no_difference 'User.count' do
-      delete :destroy, :params => {:id => 6, :confirm => User.find(6).login}
-    end
-    assert_response 404
-  end
-
   def test_destroy_should_redirect_to_back_url_param
     assert_difference 'User.count', -1 do
-      delete :destroy, :params => {:id => 2,
-                                   :confirm => User.find(2).login,
-                                   :back_url => '/users?name=foo'}
+      delete :destroy, :id => 2, :back_url => '/users?name=foo'
     end
     assert_redirected_to '/users?name=foo'
   end
 
-  def test_destroy_active_admin_should_send_security_notification
-    user = User.find(2)
-    user.admin = true
-    user.save!
-    ActionMailer::Base.deliveries.clear
-    delete :destroy, :params => {:id => user.id, :confirm => user.login}
-
-    assert_not_nil (mail = ActionMailer::Base.deliveries.last)
-    assert_mail_body_match(
-      I18n.t(
-        :mail_body_security_notification_remove,
-        field: I18n.t(:field_admin),
-        value: user.login
-      ),
-      mail
-    )
-    # All admins should receive this
-    User.where(admin: true, status: Principal::STATUS_ACTIVE).each do |admin|
-      assert_not_nil(
-        ActionMailer::Base.deliveries.detect do |mail|
-          [mail.bcc, mail.cc].flatten.include?(admin.mail)
-        end
-      )
+  def test_create_membership
+    assert_difference 'Member.count' do
+      post :edit_membership, :id => 7, :membership => { :project_id => 3, :role_ids => [2]}
     end
+    assert_redirected_to :action => 'edit', :id => '7', :tab => 'memberships'
+    member = Member.order('id DESC').first
+    assert_equal User.find(7), member.principal
+    assert_equal [2], member.role_ids
+    assert_equal 3, member.project_id
   end
 
-  def test_destroy_without_unsubscribe_is_denied
-    user = User.find(2)
-    user.update(admin: true) # Create other admin so self can be deleted
-    @request.session[:user_id] = user.id
-    with_settings unsubscribe: 0 do
-      assert_no_difference 'User.count' do
-        delete :destroy, params: {id: user.id}
-      end
-      assert_response 422
+  def test_create_membership_js_format
+    assert_difference 'Member.count' do
+      post :edit_membership, :id => 7, :membership => {:project_id => 3, :role_ids => [2]}, :format => 'js'
+      assert_response :success
+      assert_template 'edit_membership'
+      assert_equal 'text/javascript', response.content_type
     end
+    member = Member.order('id DESC').first
+    assert_equal User.find(7), member.principal
+    assert_equal [2], member.role_ids
+    assert_equal 3, member.project_id
+    assert_include 'tab-content-memberships', response.body
   end
 
-  def test_destroy_last_admin_is_denied
-    user = User.find(1)
-    @request.session[:user_id] = user.id
-    with_settings unsubscribe: 1 do
-      assert_no_difference 'User.count' do
-        delete :destroy, params: {id: user.id}
-      end
-      assert_response 422
+  def test_create_membership_js_format_with_failure
+    assert_no_difference 'Member.count' do
+      post :edit_membership, :id => 7, :membership => {:project_id => 3}, :format => 'js'
+      assert_response :success
+      assert_template 'edit_membership'
+      assert_equal 'text/javascript', response.content_type
     end
+    assert_include 'alert', response.body, "Alert message not sent"
+    assert_include 'Role can\\\'t be empty', response.body, "Error message not sent"
+  end
+
+  def test_update_membership
+    assert_no_difference 'Member.count' do
+      put :edit_membership, :id => 2, :membership_id => 1, :membership => { :role_ids => [2]}
+      assert_redirected_to :action => 'edit', :id => '2', :tab => 'memberships'
+    end
+    assert_equal [2], Member.find(1).role_ids
+  end
+
+  def test_update_membership_js_format
+    assert_no_difference 'Member.count' do
+      put :edit_membership, :id => 2, :membership_id => 1, :membership => {:role_ids => [2]}, :format => 'js'
+      assert_response :success
+      assert_template 'edit_membership'
+      assert_equal 'text/javascript', response.content_type
+    end
+    assert_equal [2], Member.find(1).role_ids
+    assert_include 'tab-content-memberships', response.body
+  end
+
+  def test_destroy_membership
+    assert_difference 'Member.count', -1 do
+      delete :destroy_membership, :id => 2, :membership_id => 1
+    end
+    assert_redirected_to :action => 'edit', :id => '2', :tab => 'memberships'
+    assert_nil Member.find_by_id(1)
+  end
+
+  def test_destroy_membership_js_format
+    assert_difference 'Member.count', -1 do
+      delete :destroy_membership, :id => 2, :membership_id => 1, :format => 'js'
+      assert_response :success
+      assert_template 'destroy_membership'
+      assert_equal 'text/javascript', response.content_type
+    end
+    assert_nil Member.find_by_id(1)
+    assert_include 'tab-content-memberships', response.body
   end
 end

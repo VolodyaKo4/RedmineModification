@@ -1,4 +1,4 @@
-class AddCustomFieldsDescription < ActiveRecord::Migration[4.2]
+class AddCustomFieldsDescription < ActiveRecord::Migration
   def up
     add_column :custom_fields, :description, :text
   end

@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -17,7 +15,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-require File.expand_path('../redcloth3', __FILE__)
+require 'redcloth3'
 require 'digest/md5'
 
 module Redmine
@@ -29,10 +27,9 @@ module Redmine
 
         alias :inline_auto_link :auto_link!
         alias :inline_auto_mailto :auto_mailto!
-        alias :inline_restore_redmine_links :restore_redmine_links
 
         # auto_link rule after textile rules so that it doesn't break !image_url! tags
-        RULES = [:textile, :block_markdown_rule, :inline_auto_link, :inline_auto_mailto, :inline_restore_redmine_links]
+        RULES = [:textile, :block_markdown_rule, :inline_auto_link, :inline_auto_mailto]
 
         def initialize(*args)
           super
@@ -57,7 +54,6 @@ module Redmine
           if hash.present? && hash != Digest::MD5.hexdigest(t[1])
             raise Redmine::WikiFormatting::StaleSectionError
           end
-
           t[1] = update unless t[1].blank?
           t.reject(&:blank?).join "\n\n"
         end
@@ -66,9 +62,9 @@ module Redmine
           @pre_list = []
           text = self.dup
           rip_offtags text, false, false
-          before = +''
-          s = +''
-          after = +''
+          before = ''
+          s = ''
+          after = ''
           i = 0
           l = 1
           started = false
@@ -109,7 +105,7 @@ module Redmine
           sections
         end
 
-        private
+      private
 
         # Patch for RedCloth.  Fixed in RedCloth r128 but _why hasn't released it yet.
         # <a href="http://code.whytheluckystiff.net/redcloth/changeset/128">http://code.whytheluckystiff.net/redcloth/changeset/128</a>
@@ -124,17 +120,9 @@ module Redmine
             ## replace <pre> content
             text.gsub!(/<redpre#(\d+)>/) do
               content = @pre_list[$1.to_i]
-              # This regex must match any data produced by RedCloth3#rip_offtags
-              if content.match(/<code\s+class=(?:"([^"]+)"|'([^']+)')>\s?(.*)/m)
-                language = $1 || $2
-                text = $3
-                if Redmine::SyntaxHighlighting.language_supported?(language)
-                  text.gsub!(/x%x%/, '&')
-                  content = "<code class=\"#{language} syntaxhl\">" +
-                    Redmine::SyntaxHighlighting.highlight_by_language(text, language)
-                else
-                  content = "<code>#{ERB::Util.h(text)}"
-                end
+              if content.match(/<code\s+class="(\w+)">\s?(.+)/m)
+                content = "<code class=\"#{$1} syntaxhl\">" +
+                  Redmine::SyntaxHighlighting.highlight_by_language($2, $1)
               end
               content
             end

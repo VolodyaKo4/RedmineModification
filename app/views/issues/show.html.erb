@@ -1,10 +1,6 @@
 <%= render :partial => 'action_menu' %>
 
-<h2 class="inline-flex"><%= issue_heading(@issue) %></h2>
-<%= issue_status_type_badge(@issue.status) %>
-<% if @issue.is_private? %>
-  <span class="badge badge-private private"><%= l(:field_is_private) %></span>
-<% end %>
+<h2><%= issue_heading(@issue) %></h2>
 
 <div class="<%= @issue.css_classes %> details">
   <% if @prev_issue_id || @next_issue_id %>
@@ -12,27 +8,18 @@
       <%= link_to_if @prev_issue_id,
                      "\xc2\xab #{l(:label_previous)}",
                      (@prev_issue_id ? issue_path(@prev_issue_id) : nil),
-                     :title => "##{@prev_issue_id}",
-                     :accesskey => accesskey(:previous) %> |
+                     :title => "##{@prev_issue_id}" %> |
       <% if @issue_position && @issue_count %>
-        <span class="position">
-          <%= link_to_if @query_path,
-                         l(:label_item_position, :position => @issue_position, :count => @issue_count),
-                         @query_path %>
-        </span> |
+        <span class="position"><%= l(:label_item_position, :position => @issue_position, :count => @issue_count) %></span> |
       <% end %>
       <%= link_to_if @next_issue_id,
                      "#{l(:label_next)} \xc2\xbb",
                      (@next_issue_id ? issue_path(@next_issue_id) : nil),
-                     :title => "##{@next_issue_id}",
-                     :accesskey => accesskey(:next) %>
+                     :title => "##{@next_issue_id}" %>
     </div>
   <% end %>
 
-  <div class="gravatar-with-child">
-    <%= author_avatar(@issue.author, :size => "50") %>
-    <%= assignee_avatar(@issue.assigned_to, :size => "22", :class => "gravatar-child") if @issue.assigned_to %>
-  </div>
+  <%= avatar(@issue.author, :size => "50") %>
 
 <div class="subject">
 <%= render_issue_subject_with_tree(@issue) %>
@@ -44,18 +31,18 @@
         <% end %>
         </p>
 
-<div class="attributes">
+<table class="attributes">
 <%= issue_fields_rows do |rows|
-  rows.left l(:field_status), @issue.status.name, :class => 'status'
-  rows.left l(:field_priority), @issue.priority.name, :class => 'priority'
+  rows.left l(:field_status), h(@issue.status.name), :class => 'status'
+  rows.left l(:field_priority), h(@issue.priority.name), :class => 'priority'
 
   unless @issue.disabled_core_fields.include?('assigned_to_id')
-    rows.left l(:field_assigned_to), (@issue.assigned_to ? link_to_user(@issue.assigned_to) : "-"), :class => 'assigned-to'
+    rows.left l(:field_assigned_to), avatar(@issue.assigned_to, :size => "14").to_s.html_safe + (@issue.assigned_to ? link_to_user(@issue.assigned_to) : "-"), :class => 'assigned-to'
   end
-  unless @issue.disabled_core_fields.include?('category_id') || (@issue.category.nil? && @issue.project.issue_categories.none?)
-    rows.left l(:field_category), (@issue.category ? @issue.category.name : "-"), :class => 'category'
+  unless @issue.disabled_core_fields.include?('category_id')
+    rows.left l(:field_category), h(@issue.category ? @issue.category.name : "-"), :class => 'category'
   end
-  unless @issue.disabled_core_fields.include?('fixed_version_id') || (@issue.fixed_version.nil? && @issue.assignable_versions.none?)
+  unless @issue.disabled_core_fields.include?('fixed_version_id')
     rows.left l(:field_fixed_version), (@issue.fixed_version ? link_to_version(@issue.fixed_version) : "-"), :class => 'fixed-version'
   end
 
@@ -63,27 +50,37 @@
     rows.right l(:field_start_date), format_date(@issue.start_date), :class => 'start-date'
   end
   unless @issue.disabled_core_fields.include?('due_date')
-    rows.right l(:field_due_date), issue_due_date_details(@issue), :class => 'due-date'
+    rows.right l(:field_due_date), format_date(@issue.due_date), :class => 'due-date'
   end
   unless @issue.disabled_core_fields.include?('done_ratio')
-    rows.right l(:field_done_ratio), progress_bar(@issue.done_ratio, :legend => "#{@issue.done_ratio}%"), :class => 'progress'
+    rows.right l(:field_done_ratio), progress_bar(@issue.done_ratio, :width => '80px', :legend => "#{@issue.done_ratio}%"), :class => 'progress'
   end
   unless @issue.disabled_core_fields.include?('estimated_hours')
-    rows.right l(:field_estimated_hours), issue_estimated_hours_details(@issue), :class => 'estimated-hours'
+    unless @issue.estimated_hours.nil?
+      rows.right l(:field_estimated_hours), l_hours(@issue.estimated_hours), :class => 'estimated-hours'
+    end
   end
-  if User.current.allowed_to?(:view_time_entries, @project) && @issue.total_spent_hours > 0
-    rows.right l(:label_spent_time), issue_spent_hours_details(@issue), :class => 'spent-time'
+  if User.current.allowed_to?(:view_time_entries, @project)
+<<<<<<< HEAD
+    unless @issue.leaves.sum(:estimated_hours).nil? || @issue.leaves.count == 0
+			rows.right l(:field_estimated_hours_of_leaves), l_hours(@issue.leaves.sum(:estimated_hours)), :class => 'estimated-hours hide-when-print'
+    end
+    rows.right l(:label_spent_time), (@issue.total_spent_hours > 0 ? link_to(l_hours(@issue.total_spent_hours), project_issue_time_entries_path(@project, @issue)) : "-"), :class => 'spent-time hide-when-print'
+=======
+    rows.right l(:label_spent_time), (@issue.total_spent_hours > 0 ? link_to(l_hours(@issue.total_spent_hours), project_issue_time_entries_path(@project, @issue)) : "-"), :class => 'spent-time'
+>>>>>>> 248a796 (pure version 2.5.1 from http://www.redmine.org/releases/redmine-2.5.1.tar.gz)
   end
 end %>
-<%= render_half_width_custom_fields_rows(@issue) %>
+<%= render_custom_fields_rows(@issue) %>
 <%= call_hook(:view_issues_show_details_bottom, :issue => @issue) %>
-</div>
+</table>
 
-<% if @issue.description? %>
+<% if @issue.description? || @issue.attachments.any? -%>
 <hr />
+<% if @issue.description? %>
 <div class="description">
   <div class="contextual">
-  <%= link_to l(:button_quote), quoted_issue_path(@issue), :remote => true, :method => 'post', :class => 'icon icon-comment' if @issue.notes_addable? %>
+  <%= link_to l(:button_quote), quoted_issue_path(@issue), :remote => true, :method => 'post', :class => 'icon icon-comment' if authorize_for('issues', 'edit') %>
   </div>
 
   <p><strong><%=l(:field_description)%></strong></p>
@@ -92,13 +89,8 @@ end %>
   </div>
 </div>
 <% end %>
-<% if @issue.attachments.any? %>
-  <hr />
-  <p><strong><%=l(:label_attachment_plural)%></strong></p>
-  <%= link_to_attachments @issue, :thumbnails => true %>
-<% end %>
-
-<%= render_full_width_custom_fields_rows(@issue) %>
+<%= link_to_attachments @issue, :thumbnails => true %>
+<% end -%>
 
 <%= call_hook(:view_issues_show_description_bottom, :issue => @issue) %>
 
@@ -108,13 +100,8 @@ end %>
 <div class="contextual">
   <%= link_to_new_subtask(@issue) if User.current.allowed_to?(:manage_subtasks, @project) %>
 </div>
-<p>
-  <strong><%=l(:label_subtask_plural)%></strong>
-  <%= render_descendants_stats(@issue) unless @issue.leaf? %>
-</p>
-<%= form_tag({}, :data => {:cm_url => issues_context_menu_path}) do %>
+<p><strong><%=l(:label_subtask_plural)%></strong></p>
 <%= render_descendants_tree(@issue) unless @issue.leaf? %>
-<% end %>
 </div>
 <% end %>
 
@@ -127,13 +114,37 @@ end %>
 
 </div>
 
-<%= render partial: 'action_menu_edit' if User.current.wants_comments_in_reverse_order? %>
-
-<div id="history">
-<%= render_tabs issue_history_tabs, issue_history_default_tab %>
+<% if @changesets.present? %>
+<div id="issue-changesets">
+<h3><%=l(:label_associated_revisions)%></h3>
+<%= render :partial => 'changesets', :locals => { :changesets => @changesets} %>
 </div>
+<% end %>
 
-<%= render partial: 'action_menu_edit' unless User.current.wants_comments_in_reverse_order? %>
+<% if @journals.present? %>
+<div id="history">
+<h3><%=l(:label_history)%></h3>
+<%= render :partial => 'history', :locals => { :issue => @issue, :journals => @journals } %>
+</div>
+<% end %>
+
+
+<div style="clear: both;"></div>
+<%= render :partial => 'action_menu' %>
+
+<div style="clear: both;"></div>
+<% if @issue.editable? %>
+  <div id="update" style="display:none;">
+  <h3><%= l(:button_edit) %></h3>
+  <%= render :partial => 'edit' %>
+<<<<<<< HEAD
+	<%# in the edit partial the 'changed' flag sets up, but here is 'show' page, so the changes may not be done. %>
+	<%# so remove the flag (in will be set up by modifying the fields) %>
+	<%= javascript_tag("$('textarea').removeData('changed');" ) %>
+=======
+>>>>>>> 248a796 (pure version 2.5.1 from http://www.redmine.org/releases/redmine-2.5.1.tar.gz)
+  </div>
+<% end %>
 
 <% other_formats_links do |f| %>
   <%= f.link_to 'Atom', :url => {:key => User.current.rss_key} %>
@@ -157,4 +168,4 @@ end %>
     <%= auto_discovery_link_tag(:atom, {:format => 'atom', :key => User.current.rss_key}, :title => "#{@issue.project} - #{@issue.tracker} ##{@issue.id}: #{@issue.subject}") %>
 <% end %>
 
-<%= context_menu %>
+<%= context_menu issues_context_menu_path %>

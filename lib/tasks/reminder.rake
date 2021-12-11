@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -23,7 +23,6 @@ Available options:
   * tracker  => id of tracker (defaults to all trackers)
   * project  => id or identifier of project (defaults to all projects)
   * users    => comma separated list of user/group ids who should be reminded
-  * version  => name of target version for filtering issues (defaults to none)
 
 Example:
   rake redmine:send_reminders days=7 users="1,23, 56" RAILS_ENV="production"
@@ -32,11 +31,10 @@ END_DESC
 namespace :redmine do
   task :send_reminders => :environment do
     options = {}
-    options[:days] = ENV['days'].presence&.to_i
-    options[:project] = ENV['project'].presence
-    options[:tracker] = ENV['tracker'].presence&.to_i
-    options[:users] = ENV['users'].presence.to_s.split(',').each(&:strip!)
-    options[:version] = ENV['version'].presence
+    options[:days] = ENV['days'].to_i if ENV['days']
+    options[:project] = ENV['project'] if ENV['project']
+    options[:tracker] = ENV['tracker'].to_i if ENV['tracker']
+    options[:users] = (ENV['users'] || '').split(',').each(&:strip!)
 
     Mailer.with_synched_deliveries do
       Mailer.reminders(options)

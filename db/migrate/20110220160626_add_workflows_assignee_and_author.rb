@@ -1,4 +1,4 @@
-class AddWorkflowsAssigneeAndAuthor < ActiveRecord::Migration[4.2]
+class AddWorkflowsAssigneeAndAuthor < ActiveRecord::Migration
   def self.up
     add_column :workflows, :assignee, :boolean, :null => false, :default => false
     add_column :workflows, :author, :boolean, :null => false, :default => false

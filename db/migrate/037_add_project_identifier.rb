@@ -1,4 +1,4 @@
-class AddProjectIdentifier < ActiveRecord::Migration[4.2]
+class AddProjectIdentifier < ActiveRecord::Migration
   def self.up
     add_column :projects, :identifier, :string, :limit => 20
   end

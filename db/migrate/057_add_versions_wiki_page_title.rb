@@ -1,4 +1,4 @@
-class AddVersionsWikiPageTitle < ActiveRecord::Migration[4.2]
+class AddVersionsWikiPageTitle < ActiveRecord::Migration
   def self.up
     add_column :versions, :wiki_page_title, :string
   end

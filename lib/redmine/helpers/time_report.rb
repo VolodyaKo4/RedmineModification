@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -47,8 +45,7 @@ module Redmine
         unless @criteria.empty?
           time_columns = %w(tyear tmonth tweek spent_on)
           @hours = []
-          @scope.includes(:activity).
-              reorder(nil).
+          @scope.includes(:issue, :activity).
               group(@criteria.collect{|criteria| @available_criteria[criteria][:sql]} + time_columns).
               joins(@criteria.collect{|criteria| @available_criteria[criteria][:joins]}.compact).
               sum(:hours).each do |hash, hours|
@@ -58,7 +55,7 @@ module Redmine
             end
             @hours << h
           end
-
+          
           @hours.each do |row|
             case @columns
             when 'year'
@@ -71,13 +68,13 @@ module Redmine
               row['day'] = "#{row['spent_on']}"
             end
           end
-
+          
           min = @hours.collect {|row| row['spent_on']}.min
-          @from = min ? min.to_date : User.current.today
+          @from = min ? min.to_date : Date.today
 
           max = @hours.collect {|row| row['spent_on']}.max
-          @to = max ? max.to_date : User.current.today
-
+          @to = max ? max.to_date : Date.today
+          
           @total_hours = @hours.inject(0) {|s,k| s = s + k['hours'].to_f}
 
           @periods = []
@@ -104,44 +101,43 @@ module Redmine
       end
 
       def load_available_criteria
-        @available_criteria = {
-          'project' => {:sql => "#{TimeEntry.table_name}.project_id",
-                        :klass => Project,
-                        :label => :label_project},
-          'status' => {:sql => "#{Issue.table_name}.status_id",
-                       :klass => IssueStatus,
-                       :label => :field_status},
-          'version' => {:sql => "#{Issue.table_name}.fixed_version_id",
-                        :klass => ::Version,
-                        :label => :label_version},
-          'category' => {:sql => "#{Issue.table_name}.category_id",
-                         :klass => IssueCategory,
-                         :label => :field_category},
-          'user' => {:sql => "#{TimeEntry.table_name}.user_id",
-                     :klass => User,
-                     :label => :label_user},
-          'tracker' => {:sql => "#{Issue.table_name}.tracker_id",
-                        :klass => Tracker,
-                        :label => :label_tracker},
-          'activity' => {:sql => "#{TimeEntry.table_name}.activity_id",
-                         :klass => TimeEntryActivity,
-                         :label => :field_activity},
-          'issue' => {:sql => "#{TimeEntry.table_name}.issue_id",
-                      :klass => Issue,
-                      :label => :label_issue}
-        }
+        @available_criteria = { 'project' => {:sql => "#{TimeEntry.table_name}.project_id",
+                                              :klass => Project,
+                                              :label => :label_project},
+                                 'status' => {:sql => "#{Issue.table_name}.status_id",
+                                              :klass => IssueStatus,
+                                              :label => :field_status},
+                                 'version' => {:sql => "#{Issue.table_name}.fixed_version_id",
+                                              :klass => Version,
+                                              :label => :label_version},
+                                 'category' => {:sql => "#{Issue.table_name}.category_id",
+                                                :klass => IssueCategory,
+                                                :label => :field_category},
+                                 'user' => {:sql => "#{TimeEntry.table_name}.user_id",
+                                             :klass => User,
+                                             :label => :label_user},
+                                 'tracker' => {:sql => "#{Issue.table_name}.tracker_id",
+                                              :klass => Tracker,
+                                              :label => :label_tracker},
+                                 'activity' => {:sql => "#{TimeEntry.table_name}.activity_id",
+                                               :klass => TimeEntryActivity,
+                                               :label => :label_activity},
+                                 'issue' => {:sql => "#{TimeEntry.table_name}.issue_id",
+                                             :klass => Issue,
+                                             :label => :label_issue}
+                               }
 
         # Add time entry custom fields
-        custom_fields = TimeEntryCustomField.visible
+        custom_fields = TimeEntryCustomField.all
         # Add project custom fields
-        custom_fields += ProjectCustomField.visible
+        custom_fields += ProjectCustomField.all
         # Add issue custom fields
-        custom_fields += @project.nil? ? IssueCustomField.visible.for_all : @project.all_issue_custom_fields.visible
+        custom_fields += (@project.nil? ? IssueCustomField.for_all : @project.all_issue_custom_fields)
         # Add time entry activity custom fields
-        custom_fields += TimeEntryActivityCustomField.visible
+        custom_fields += TimeEntryActivityCustomField.all
 
         # Add list and boolean custom fields as available criteria
-        custom_fields.select {|cf| %w(list bool).include?(cf.field_format) && !cf.multiple?}.each do |cf|
+        custom_fields.select {|cf| %w(list bool).include? cf.field_format }.each do |cf|
           @available_criteria["cf_#{cf.id}"] = {:sql => cf.group_statement,
                                                  :joins => cf.join_for_order_statement,
                                                  :format => cf.field_format,

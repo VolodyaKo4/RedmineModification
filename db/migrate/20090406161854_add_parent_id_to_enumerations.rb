@@ -1,4 +1,4 @@
-class AddParentIdToEnumerations < ActiveRecord::Migration[4.2]
+class AddParentIdToEnumerations < ActiveRecord::Migration
   def self.up
     add_column :enumerations, :parent_id, :integer, :null => true, :default => nil
   end

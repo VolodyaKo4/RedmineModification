@@ -1,8 +1,8 @@
 Description:
     The plugin generator creates stubs for a new Redmine plugin.
-
+	
 Example:
-    bundle exec rails generate redmine_plugin meetings
+    ./script/rails generate redmine_plugin meetings
       create  plugins/meetings/app
       create  plugins/meetings/app/controllers
       create  plugins/meetings/app/helpers

@@ -1,4 +1,4 @@
-class AddMissingIndexesToAuthSources < ActiveRecord::Migration[4.2]
+class AddMissingIndexesToAuthSources < ActiveRecord::Migration
   def self.up
     add_index :auth_sources, [:id, :type]
   end

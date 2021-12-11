@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -34,7 +32,7 @@ module Redmine
         @safe_attributes ||= []
         if args.empty?
           if superclass.include?(Redmine::SafeAttributes)
-            @safe_attributes + superclass.safe_attributes
+            @safe_attributes + superclass.safe_attributes 
           else
             @safe_attributes
           end
@@ -76,16 +74,12 @@ module Redmine
     #   # => {'title' => 'My book'}
     def delete_unsafe_attributes(attrs, user=User.current)
       safe = safe_attribute_names(user)
-      attrs.dup.delete_if {|k,v| !safe.include?(k.to_s)}
+      attrs.dup.delete_if {|k,v| !safe.include?(k)}
     end
 
     # Sets attributes from attrs that are safe
     # attrs is a Hash with string keys
     def safe_attributes=(attrs, user=User.current)
-      if attrs.respond_to?(:to_unsafe_hash)
-        attrs = attrs.to_unsafe_hash
-      end
-
       return unless attrs.is_a?(Hash)
       self.attributes = delete_unsafe_attributes(attrs, user)
     end

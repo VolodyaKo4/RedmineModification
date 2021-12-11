@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -22,7 +20,6 @@ require File.expand_path('../../../../test_helper', __FILE__)
 class Redmine::Hook::ManagerTest < ActionView::TestCase
   fixtures :projects, :users, :members, :member_roles, :roles,
            :groups_users,
-           :email_addresses,
            :trackers, :projects_trackers,
            :enabled_modules,
            :versions,
@@ -69,7 +66,6 @@ class Redmine::Hook::ManagerTest < ActionView::TestCase
 
   def setup
     @hook_module = Redmine::Hook
-    @hook_module.clear_listeners
   end
 
   def teardown
@@ -114,15 +110,6 @@ class Redmine::Hook::ManagerTest < ActionView::TestCase
     @hook_module.add_listener(TestLinkToHook)
 
     assert_equal ['<a href="/issues">Issues</a>'], hook_helper.call_hook(:view_layouts_base_html_head)
-  end
-
-  def test_view_hook_should_generate_links_with_relative_url_root
-    Redmine::Utils.relative_url_root = '/foo'
-    @hook_module.add_listener(TestLinkToHook)
-
-    assert_equal ['<a href="/foo/issues">Issues</a>'], hook_helper.call_hook(:view_layouts_base_html_head)
-  ensure
-    Redmine::Utils.relative_url_root = ''
   end
 
   # Context: Redmine::Hook::Helper.call_hook
@@ -188,3 +175,4 @@ class Redmine::Hook::ManagerTest < ActionView::TestCase
     @view_hook_helper ||= TestHookHelperView.new(Rails.root.to_s + '/app/views')
   end
 end
+

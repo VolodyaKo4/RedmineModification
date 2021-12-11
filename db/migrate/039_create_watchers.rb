@@ -1,4 +1,4 @@
-class CreateWatchers < ActiveRecord::Migration[4.2]
+class CreateWatchers < ActiveRecord::Migration
   def self.up
     create_table :watchers do |t|
       t.column :watchable_type, :string, :default => "", :null => false

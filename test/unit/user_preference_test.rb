@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -21,41 +19,6 @@ require File.expand_path('../../test_helper', __FILE__)
 
 class UserPreferenceTest < ActiveSupport::TestCase
   fixtures :users, :user_preferences
-
-  def setup
-    User.current = nil
-  end
-
-  def test_hide_mail_should_default_to_true
-    preference = UserPreference.new
-    assert_equal true, preference.hide_mail
-  end
-
-  def test_hide_mail_should_default_to_false_with_setting
-    with_settings :default_users_hide_mail => '0' do
-      preference = UserPreference.new
-      assert_equal false, preference.hide_mail
-    end
-  end
-
-  def test_time_zone_should_default_to_setting
-    with_settings :default_users_time_zone => 'Paris' do
-      preference = UserPreference.new
-      assert_equal 'Paris', preference.time_zone
-    end
-  end
-
-  def test_no_self_notified_should_default_to_true
-    preference = UserPreference.new
-    assert_equal true, preference.no_self_notified
-  end
-
-  def test_no_self_notified_should_default_to_setting
-    with_settings :default_users_no_self_notified => '0' do
-      preference = UserPreference.new
-      assert_equal false, preference.no_self_notified
-    end
-  end
 
   def test_create
     user = User.new(:firstname => "new", :lastname => "user", :mail => "newuser@somenet.foo")
@@ -92,6 +55,11 @@ class UserPreferenceTest < ActiveSupport::TestCase
     assert_kind_of Hash, up.others
   end
 
+  def test_others_should_be_blank_after_initialization
+    pref = User.new.pref
+    assert_equal({}, pref.others)
+  end
+
   def test_reading_value_from_nil_others_hash
     up = UserPreference.new(:user => User.new)
     up.others = nil
@@ -105,23 +73,5 @@ class UserPreferenceTest < ActiveSupport::TestCase
     assert_nil up.others
     up[:foo] = 'bar'
     assert_equal 'bar', up[:foo]
-  end
-
-  def test_removing_a_block_should_clear_its_settings
-    up = User.find(2).pref
-    up.my_page_layout = {'top' => ['news', 'documents']}
-    up.my_page_settings = {'news' => {:foo => 'bar'}, 'documents' => {:baz => 'quz'}}
-    up.save!
-
-    up.remove_block 'news'
-    up.save!
-    assert_equal ['documents'], up.my_page_settings.keys
-  end
-
-  def test_toolbar_language_options_setter_should_remove_except_supported_languages
-    up = User.find(2).pref
-    # bar is not a supported language
-    up.toolbar_language_options = 'ruby,cpp,bar,c'
-    assert_equal 'ruby,cpp,c', up.toolbar_language_options
   end
 end

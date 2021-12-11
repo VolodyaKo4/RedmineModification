@@ -1,4 +1,4 @@
-class FixMessagesStickyNull < ActiveRecord::Migration[4.2]
+class FixMessagesStickyNull < ActiveRecord::Migration
   def self.up
     Message.where('sticky IS NULL').update_all('sticky = 0')
   end

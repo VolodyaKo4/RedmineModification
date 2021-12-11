@@ -1,4 +1,4 @@
-class AddProjectToEnumerations < ActiveRecord::Migration[4.2]
+class AddProjectToEnumerations < ActiveRecord::Migration
   def self.up
     add_column :enumerations, :project_id, :integer, :null => true, :default => nil
     add_index :enumerations, :project_id

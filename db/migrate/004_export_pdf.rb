@@ -1,4 +1,4 @@
-class ExportPdf < ActiveRecord::Migration[4.2]
+class ExportPdf < ActiveRecord::Migration
   # model removed
   class Permission < ActiveRecord::Base; end
 

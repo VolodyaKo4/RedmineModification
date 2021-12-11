@@ -1,4 +1,4 @@
-class AddChangesetsUserId < ActiveRecord::Migration[4.2]
+class AddChangesetsUserId < ActiveRecord::Migration
   def self.up
     add_column :changesets, :user_id, :integer, :default => nil
   end

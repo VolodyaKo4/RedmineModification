@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -43,10 +41,12 @@ class Redmine::ApiTest::DisabledRestApiTest < Redmine::ApiTest::Base
     @token = Token.create!(:user => @user, :action => 'api')
 
     get "/news.xml?key=#{@token.value}"
-    assert_response :forbidden
+    assert_response :unauthorized
+    assert_equal User.anonymous, User.current
 
     get "/news.json?key=#{@token.value}"
-    assert_response :forbidden
+    assert_response :unauthorized
+    assert_equal User.anonymous, User.current
   end
 
   def test_with_valid_username_password_http_authentication
@@ -54,21 +54,25 @@ class Redmine::ApiTest::DisabledRestApiTest < Redmine::ApiTest::Base
       user.password = 'my_password'
     end
 
-    get "/news.xml", :headers => credentials(@user.login, 'my_password')
-    assert_response :forbidden
+    get "/news.xml", nil, credentials(@user.login, 'my_password')
+    assert_response :unauthorized
+    assert_equal User.anonymous, User.current
 
-    get "/news.json", :headers => credentials(@user.login, 'my_password')
-    assert_response :forbidden
+    get "/news.json", nil, credentials(@user.login, 'my_password')
+    assert_response :unauthorized
+    assert_equal User.anonymous, User.current
   end
 
   def test_with_valid_token_http_authentication
     @user = User.generate!
     @token = Token.create!(:user => @user, :action => 'api')
 
-    get "/news.xml", :headers => credentials(@token.value, 'X')
-    assert_response :forbidden
+    get "/news.xml", nil, credentials(@token.value, 'X')
+    assert_response :unauthorized
+    assert_equal User.anonymous, User.current
 
-    get "/news.json", :headers => credentials(@token.value, 'X')
-    assert_response :forbidden
+    get "/news.json", nil, credentials(@token.value, 'X')
+    assert_response :unauthorized
+    assert_equal User.anonymous, User.current
   end
 end

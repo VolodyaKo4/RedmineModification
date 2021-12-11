@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,21 +18,9 @@
 require File.expand_path('../../test_helper', __FILE__)
 
 class TimeEntryActivityTest < ActiveSupport::TestCase
-  fixtures :enumerations, :time_entries,
-           :custom_fields, :custom_values,
-           :issues, :projects, :users,
-           :members, :roles, :member_roles,
-           :trackers, :issue_statuses,
-           :projects_trackers,
-           :issue_categories,
-           :groups_users,
-           :enabled_modules
+  fixtures :enumerations, :time_entries, :custom_fields
 
   include Redmine::I18n
-
-  def setup
-    User.current = nil
-  end
 
   def test_should_be_an_enumeration
     assert TimeEntryActivity.ancestors.include?(Enumeration)
@@ -66,7 +52,7 @@ class TimeEntryActivityTest < ActiveSupport::TestCase
 
     e = TimeEntryActivity.new(:name => 'Custom Data')
     assert !e.save
-    assert_equal ["Billable cannot be blank"], e.errors.full_messages
+    assert_equal ["Billable can't be blank"], e.errors.full_messages
   end
 
   def test_create_with_required_custom_field_should_succeed
@@ -90,7 +76,7 @@ class TimeEntryActivityTest < ActiveSupport::TestCase
     # Blanking custom field, save should fail
     e.custom_field_values = {field.id => ""}
     assert !e.save
-    assert_equal ["Billable cannot be blank"], e.errors.full_messages
+    assert_equal ["Billable can't be blank"], e.errors.full_messages
 
     # Update custom field to valid value, save should succeed
     e.custom_field_values = {field.id => "0"}
@@ -102,9 +88,8 @@ class TimeEntryActivityTest < ActiveSupport::TestCase
   def test_system_activity_with_child_in_use_should_be_in_use
     project = Project.generate!
     system_activity = TimeEntryActivity.create!(:name => 'Activity')
-    project_activity =
-      TimeEntryActivity.create!(:name => 'Activity', :project => project,
-                                :parent_id => system_activity.id)
+    project_activity = TimeEntryActivity.create!(:name => 'Activity', :project => project, :parent_id => system_activity.id)
+
     TimeEntry.generate!(:project => project, :activity => project_activity)
 
     assert project_activity.in_use?
@@ -113,61 +98,19 @@ class TimeEntryActivityTest < ActiveSupport::TestCase
 
   def test_destroying_a_system_activity_should_reassign_children_activities
     project = Project.generate!
-    entries = []
     system_activity = TimeEntryActivity.create!(:name => 'Activity')
-    entries << TimeEntry.generate!(:project => project, :activity => system_activity)
-    project_activity =
-      TimeEntryActivity.create!(:name => 'Activity', :project => project,
-                                :parent_id => system_activity.id)
-    entries << TimeEntry.generate!(:project => project.reload, :activity => project_activity)
+    project_activity = TimeEntryActivity.create!(:name => 'Activity', :project => project, :parent_id => system_activity.id)
+
+    entries = [
+      TimeEntry.generate!(:project => project, :activity => system_activity),
+      TimeEntry.generate!(:project => project, :activity => project_activity)
+    ]
+
     assert_difference 'TimeEntryActivity.count', -2 do
       assert_nothing_raised do
         assert system_activity.destroy(TimeEntryActivity.find_by_name('Development'))
       end
     end
     assert entries.all? {|entry| entry.reload.activity.name == 'Development'}
-  end
-
-  def test_project_activity_without_parent_should_not_disable_system_activities
-    project = Project.find(1)
-    activity = TimeEntryActivity.create!(:name => 'Csutom', :project => project)
-    assert_include activity, project.activities
-    assert_include TimeEntryActivity.find(9), project.activities
-  end
-
-  def test_project_activity_should_have_the_same_position_as_parent_activity
-    project = Project.find(1)
-
-    parent_activity = TimeEntryActivity.find_by(position: 3, parent_id: nil)
-    project.update_or_create_time_entry_activities(
-      {
-        parent_activity.id.to_s => {
-          'parent_id' => parent_activity.id.to_s,
-          'active' => '0',
-          'custom_field_values' => {'7' => ''}
-        }
-      }
-    )
-    project_activity = TimeEntryActivity.find_by(position: 3, parent_id: parent_activity.id, project_id: 1)
-    assert_equal parent_activity.position, project_activity.position
-
-    # Changing the position of the parent activity also changes the position of the activity in each project.
-    other_parent_activity = TimeEntryActivity.find_by(position: 4, parent_id: nil)
-    project.update_or_create_time_entry_activities(
-      {
-        other_parent_activity.id.to_s => {
-          'parent_id' => other_parent_activity.id.to_s,
-          'active' => '0',
-          'custom_field_values' => {'7' => ''}
-        }
-      }
-    )
-    other_project_activity = TimeEntryActivity.find_by(position: 4, parent_id: other_parent_activity.id, project_id: 1)
-
-    parent_activity.update(position: 4)
-    assert_equal 4, parent_activity.reload.position
-    assert_equal parent_activity.position, project_activity.reload.position
-    assert_equal 3, other_parent_activity.reload.position
-    assert_equal other_parent_activity.position, other_project_activity.reload.position
   end
 end

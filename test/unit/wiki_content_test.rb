@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -22,11 +20,9 @@ require File.expand_path('../../test_helper', __FILE__)
 class WikiContentTest < ActiveSupport::TestCase
   fixtures :projects, :enabled_modules,
            :users, :members, :member_roles, :roles,
-           :email_addresses,
            :wikis, :wiki_pages, :wiki_contents, :wiki_content_versions
 
   def setup
-    User.current = nil
     @wiki = Wiki.find(1)
     @page = @wiki.pages.first
   end
@@ -56,24 +52,22 @@ class WikiContentTest < ActiveSupport::TestCase
       assert page.save
     end
 
-    assert_equal 2, ActionMailer::Base.deliveries.size
-    ActionMailer::Base.deliveries.each do |mail|
-      assert_include 'wiki page has been added', mail_body(mail)
-    end
+    assert_equal 1, ActionMailer::Base.deliveries.size
+    assert_include 'wiki page has been added', mail_body(ActionMailer::Base.deliveries.last)
   end
 
   def test_update_should_be_versioned
     content = @page.content
     version_count = content.version
     content.text = "My new content"
-    assert_difference 'WikiContentVersion.count' do
+    assert_difference 'WikiContent::Version.count' do
       assert content.save
     end
     content.reload
     assert_equal version_count+1, content.version
     assert_equal version_count+1, content.versions.length
 
-    version = WikiContentVersion.order('id DESC').first
+    version = WikiContent::Version.order('id DESC').first
     assert_equal @page.id, version.page_id
     assert_equal '', version.compression
     assert_equal "My new content", version.data
@@ -84,12 +78,12 @@ class WikiContentTest < ActiveSupport::TestCase
     with_settings :wiki_compression => 'gzip' do
       content = @page.content
       content.text = "My new content"
-      assert_difference 'WikiContentVersion.count' do
+      assert_difference 'WikiContent::Version.count' do
         assert content.save
       end
     end
 
-    version = WikiContentVersion.order('id DESC').first
+    version = WikiContent::Version.order('id DESC').first
     assert_equal @page.id, version.page_id
     assert_equal 'gzip', version.compression
     assert_not_equal "My new content", version.data
@@ -101,14 +95,12 @@ class WikiContentTest < ActiveSupport::TestCase
     content = @page.content
     content.text = "My new content"
 
-    with_settings :notified_events => %w(wiki_content_updated), :default_language => 'en' do
+    with_settings :notified_events => %w(wiki_content_updated) do
       assert content.save
     end
 
-    assert_equal 2, ActionMailer::Base.deliveries.size
-    ActionMailer::Base.deliveries.each do |mail|
-      assert_include 'wiki page has been updated', mail_body(mail)
-    end
+    assert_equal 1, ActionMailer::Base.deliveries.size
+    assert_include 'wiki page has been updated', mail_body(ActionMailer::Base.deliveries.last)
   end
 
   def test_fetch_history
@@ -134,39 +126,39 @@ class WikiContentTest < ActiveSupport::TestCase
   end
 
   def test_previous_for_first_version_should_return_nil
-    content = WikiContentVersion.find_by_page_id_and_version(1, 1)
+    content = WikiContent::Version.find_by_page_id_and_version(1, 1)
     assert_nil content.previous
   end
 
   def test_previous_for_version_should_return_previous_version
-    content = WikiContentVersion.find_by_page_id_and_version(1, 3)
+    content = WikiContent::Version.find_by_page_id_and_version(1, 3)
     assert_not_nil content.previous
     assert_equal 2, content.previous.version
   end
 
   def test_previous_for_version_with_gap_should_return_previous_available_version
-    WikiContentVersion.find_by_page_id_and_version(1, 2).destroy
+    WikiContent::Version.find_by_page_id_and_version(1, 2).destroy
 
-    content = WikiContentVersion.find_by_page_id_and_version(1, 3)
+    content = WikiContent::Version.find_by_page_id_and_version(1, 3)
     assert_not_nil content.previous
     assert_equal 1, content.previous.version
   end
 
   def test_next_for_last_version_should_return_nil
-    content = WikiContentVersion.find_by_page_id_and_version(1, 3)
+    content = WikiContent::Version.find_by_page_id_and_version(1, 3)
     assert_nil content.next
   end
 
   def test_next_for_version_should_return_next_version
-    content = WikiContentVersion.find_by_page_id_and_version(1, 1)
+    content = WikiContent::Version.find_by_page_id_and_version(1, 1)
     assert_not_nil content.next
     assert_equal 2, content.next.version
   end
 
   def test_next_for_version_with_gap_should_return_next_available_version
-    WikiContentVersion.find_by_page_id_and_version(1, 2).destroy
+    WikiContent::Version.find_by_page_id_and_version(1, 2).destroy
 
-    content = WikiContentVersion.find_by_page_id_and_version(1, 1)
+    content = WikiContent::Version.find_by_page_id_and_version(1, 1)
     assert_not_nil content.next
     assert_equal 3, content.next.version
   end

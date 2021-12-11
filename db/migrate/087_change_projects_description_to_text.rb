@@ -1,4 +1,4 @@
-class ChangeProjectsDescriptionToText < ActiveRecord::Migration[4.2]
+class ChangeProjectsDescriptionToText < ActiveRecord::Migration
   def self.up
     change_column :projects, :description, :text, :null => true, :default => nil
   end

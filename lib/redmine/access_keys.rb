@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,16 +17,12 @@
 
 module Redmine
   module AccessKeys
-    unless const_defined?(:ACCESSKEYS)
-      ACCESSKEYS = {
-        :edit => 'e',
-        :quick_search => 'f',
-        :search => '4',
-        :new_issue => '7',
-        :previous => 'p',
-        :next => 'n'
-      }.freeze
-    end
+    ACCESSKEYS = {:edit => 'e',
+                  :preview => 'r',
+                  :quick_search => 'f',
+                  :search => '4',
+                  :new_issue => '7'
+                 }.freeze unless const_defined?(:ACCESSKEYS)
 
     def self.key_for(action)
       ACCESSKEYS[action]

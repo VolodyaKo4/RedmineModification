@@ -1,4 +1,4 @@
-class AddIssueCategoriesAssignedToId < ActiveRecord::Migration[4.2]
+class AddIssueCategoriesAssignedToId < ActiveRecord::Migration
   def self.up
     add_column :issue_categories, :assigned_to_id, :integer
   end

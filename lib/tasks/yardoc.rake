@@ -2,8 +2,8 @@ begin
   require 'yard'
 
   YARD::Rake::YardocTask.new do |t|
-    files = ['app/**/*.rb']
-    files << Dir['lib/**/*.rb', 'plugins/**/*.rb'].reject {|f| f.match(/test/) }
+    files = ['lib/**/*.rb', 'app/**/*.rb']
+    files << Dir['vendor/plugins/**/*.rb'].reject {|f| f.match(/test/) } # Exclude test files
     t.files = files
 
     static_files = ['doc/CHANGELOG',
@@ -12,7 +12,7 @@ begin
                     'doc/RUNNING_TESTS',
                     'doc/UPGRADING'].join(',')
 
-    t.options += ['--no-private', '--output-dir', './doc/app', '--files', static_files]
+    t.options += ['--output-dir', './doc/app', '--files', static_files]
   end
 
 rescue LoadError

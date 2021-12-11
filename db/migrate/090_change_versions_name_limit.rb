@@ -1,4 +1,4 @@
-class ChangeVersionsNameLimit < ActiveRecord::Migration[4.2]
+class ChangeVersionsNameLimit < ActiveRecord::Migration
   def self.up
     change_column :versions, :name, :string, :limit => nil
   end

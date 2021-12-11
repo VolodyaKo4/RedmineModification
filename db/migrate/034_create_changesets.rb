@@ -1,4 +1,4 @@
-class CreateChangesets < ActiveRecord::Migration[4.2]
+class CreateChangesets < ActiveRecord::Migration
   def self.up
     create_table :changesets do |t|
       t.column :repository_id, :integer, :null => false

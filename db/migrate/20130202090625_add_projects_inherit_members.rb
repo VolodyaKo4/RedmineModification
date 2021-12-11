@@ -1,4 +1,4 @@
-class AddProjectsInheritMembers < ActiveRecord::Migration[4.2]
+class AddProjectsInheritMembers < ActiveRecord::Migration
   def up
     add_column :projects, :inherit_members, :boolean, :default => false, :null => false
   end

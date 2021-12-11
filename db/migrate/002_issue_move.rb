@@ -1,4 +1,4 @@
-class IssueMove < ActiveRecord::Migration[4.2]
+class IssueMove < ActiveRecord::Migration
   # model removed
   class Permission < ActiveRecord::Base; end
 

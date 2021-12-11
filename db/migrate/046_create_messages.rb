@@ -1,4 +1,4 @@
-class CreateMessages < ActiveRecord::Migration[4.2]
+class CreateMessages < ActiveRecord::Migration
   def self.up
     create_table :messages do |t|
       t.column :board_id, :integer, :null => false

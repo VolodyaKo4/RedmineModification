@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,7 +18,7 @@
 require File.expand_path('../../test_helper', __FILE__)
 require 'issues_controller'
 
-class IssuesControllerTransactionTest < Redmine::ControllerTest
+class IssuesControllerTransactionTest < ActionController::TestCase
   tests IssuesController
   fixtures :projects,
            :users,
@@ -46,7 +44,7 @@ class IssuesControllerTransactionTest < Redmine::ControllerTest
            :journal_details,
            :queries
 
-  self.use_transactional_tests = false
+  self.use_transactional_fixtures = false
 
   def setup
     User.current = nil
@@ -58,33 +56,26 @@ class IssuesControllerTransactionTest < Redmine::ControllerTest
 
     assert_no_difference 'Journal.count' do
       assert_no_difference 'TimeEntry.count' do
-        put(
-          :update,
-          :params => {
-            :id => issue.id,
-            :issue => {
-              :fixed_version_id => 4,
-              :notes => 'My notes',
-              :lock_version => (issue.lock_version - 1)
-            },
-            :time_entry => {
-              :hours => '2.5',
-              :comments => '',
-              :activity_id => TimeEntryActivity.first.id
-            }
-          }
-        )
+        put :update,
+              :id => issue.id,
+              :issue => {
+                :fixed_version_id => 4,
+                :notes => 'My notes',
+                :lock_version => (issue.lock_version - 1)
+              },
+              :time_entry => { :hours => '2.5', :comments => '', :activity_id => TimeEntryActivity.first.id }
       end
     end
 
     assert_response :success
+    assert_template 'edit'
 
     assert_select 'div.conflict'
     assert_select 'input[name=?][value=?]', 'conflict_resolution', 'overwrite'
     assert_select 'input[name=?][value=?]', 'conflict_resolution', 'add_notes'
     assert_select 'label' do
       assert_select 'input[name=?][value=?]', 'conflict_resolution', 'cancel'
-      assert_select 'a[href="/issues/2"]'
+      assert_select 'a[href=/issues/2]'
     end
   end
 
@@ -96,154 +87,103 @@ class IssuesControllerTransactionTest < Redmine::ControllerTest
     assert_no_difference 'Journal.count' do
       assert_no_difference 'TimeEntry.count' do
         assert_difference 'Attachment.count' do
-          put(
-            :update,
-            :params => {
-              :id => issue.id,
-              :issue => {
-                :fixed_version_id => 4,
-                :notes => 'My notes',
-                :lock_version => (issue.lock_version - 1)
-              },
-              :attachments => {
-                '1' => {
-                  'file' => uploaded_test_file('testfile.txt', 'text/plain')
-                }
-              },
-              :time_entry => {
-                :hours => '2.5',
-                :comments => '',
-                :activity_id => TimeEntryActivity.first.id
-              }
-            }
-          )
+          put :update,
+                :id => issue.id,
+                :issue => {
+                  :fixed_version_id => 4,
+                  :notes => 'My notes',
+                  :lock_version => (issue.lock_version - 1)
+                },
+                :attachments => {'1' => {'file' => uploaded_test_file('testfile.txt', 'text/plain')}},
+                :time_entry => { :hours => '2.5', :comments => '', :activity_id => TimeEntryActivity.first.id }
         end
       end
     end
 
     assert_response :success
-
+    assert_template 'edit'
     attachment = Attachment.order('id DESC').first
-    assert_select 'input[name=?][value=?]', 'attachments[p0][token]', attachment.token
-    assert_select 'input[name=?][value=?]', 'attachments[p0][filename]', 'testfile.txt'
+    assert_tag 'input', :attributes => {:name => 'attachments[p0][token]', :value => attachment.token}
+    assert_tag 'input', :attributes => {:name => 'attachments[p0][filename]', :value => 'testfile.txt'}
   end
 
   def test_update_stale_issue_without_notes_should_not_show_add_notes_option
     issue = Issue.find(2)
     @request.session[:user_id] = 2
 
-    put(
-      :update,
-      :params => {
-        :id => issue.id,
-        :issue => {
-          :fixed_version_id => 4,
-          :notes => '',
-          :lock_version => (issue.lock_version - 1)
-        }
-      }
-    )
-    assert_response :success
+    put :update, :id => issue.id,
+          :issue => {
+            :fixed_version_id => 4,
+            :notes => '',
+            :lock_version => (issue.lock_version - 1)
+          }
 
-    assert_select 'div.conflict'
-    assert_select 'input[name=conflict_resolution][value=overwrite]'
-    assert_select 'input[name=conflict_resolution][value=add_notes]', 0
-    assert_select 'input[name=conflict_resolution][value=cancel]'
+    assert_tag 'div', :attributes => {:class => 'conflict'}
+    assert_tag 'input', :attributes => {:name => 'conflict_resolution', :value => 'overwrite'}
+    assert_no_tag 'input', :attributes => {:name => 'conflict_resolution', :value => 'add_notes'}
+    assert_tag 'input', :attributes => {:name => 'conflict_resolution', :value => 'cancel'}
   end
 
   def test_update_stale_issue_should_show_conflicting_journals
     @request.session[:user_id] = 2
 
-    put(
-      :update,
-      :params => {
-        :id => 1,
-        :issue => {
-          :fixed_version_id => 4,
-          :notes => '',
-          :lock_version => 2
-        },
-        :last_journal_id => 1
-      }
-    )
-    assert_response :success
+    put :update, :id => 1,
+          :issue => {
+            :fixed_version_id => 4,
+            :notes => '',
+            :lock_version => 2
+          },
+          :last_journal_id => 1
 
-    assert_select '.conflict-journal', 1
-    assert_select 'div.conflict', :text => /Some notes with Redmine links/
+    assert_not_nil assigns(:conflict_journals)
+    assert_equal 1, assigns(:conflict_journals).size
+    assert_equal 2, assigns(:conflict_journals).first.id
+    assert_tag 'div', :attributes => {:class => 'conflict'},
+      :descendant => {:content => /Some notes with Redmine links/}
   end
 
   def test_update_stale_issue_without_previous_journal_should_show_all_journals
     @request.session[:user_id] = 2
 
-    put(
-      :update,
-      :params => {
-        :id => 1,
-        :issue => {
-          :fixed_version_id => 4,
-          :notes => '',
-          :lock_version => 2
-        },
-        :last_journal_id => ''
-      }
-    )
-    assert_response :success
+    put :update, :id => 1,
+          :issue => {
+            :fixed_version_id => 4,
+            :notes => '',
+            :lock_version => 2
+          },
+          :last_journal_id => ''
 
-    assert_select '.conflict-journal', 2
-    assert_select 'div.conflict', :text => /Some notes with Redmine links/
-    assert_select 'div.conflict', :text => /Journal notes/
+    assert_not_nil assigns(:conflict_journals)
+    assert_equal 2, assigns(:conflict_journals).size
+    assert_tag 'div', :attributes => {:class => 'conflict'},
+      :descendant => {:content => /Some notes with Redmine links/}
+    assert_tag 'div', :attributes => {:class => 'conflict'},
+      :descendant => {:content => /Journal notes/}
   end
 
   def test_update_stale_issue_should_show_private_journals_with_permission_only
     journal = Journal.create!(:journalized => Issue.find(1), :notes => 'Privates notes', :private_notes => true, :user_id => 1)
 
     @request.session[:user_id] = 2
-    put(
-      :update,
-      :params => {
-        :id => 1,
-        :issue => {
-          :fixed_version_id => 4,
-          :lock_version => 2
-        },
-        :last_journal_id => ''
-      }
-    )
-    assert_response :success
-    assert_select '.conflict-journal', :text => /Privates notes/
+    put :update, :id => 1, :issue => {:fixed_version_id => 4, :lock_version => 2}, :last_journal_id => ''
+    assert_include journal, assigns(:conflict_journals)
 
     Role.find(1).remove_permission! :view_private_notes
-    put(
-      :update,
-      :params => {
-        :id => 1,
-        :issue => {
-          :fixed_version_id => 4,
-          :lock_version => 2
-        },
-        :last_journal_id => ''
-      }
-    )
-    assert_response :success
-    assert_select '.conflict-journal', :text => /Privates notes/, :count => 0
+    put :update, :id => 1, :issue => {:fixed_version_id => 4, :lock_version => 2}, :last_journal_id => ''
+    assert_not_include journal, assigns(:conflict_journals)
   end
 
   def test_update_stale_issue_with_overwrite_conflict_resolution_should_update
     @request.session[:user_id] = 2
 
     assert_difference 'Journal.count' do
-      put(
-        :update,
-        :params => {
-          :id => 1,
-          :issue => {
-            :fixed_version_id => 4,
-            :notes => 'overwrite_conflict_resolution',
-            :lock_version => 2
-          },
-          :conflict_resolution => 'overwrite'
-        }
-      )
+      put :update, :id => 1,
+            :issue => {
+              :fixed_version_id => 4,
+              :notes => 'overwrite_conflict_resolution',
+              :lock_version => 2
+            },
+            :conflict_resolution => 'overwrite'
     end
 
     assert_response 302
@@ -258,18 +198,13 @@ class IssuesControllerTransactionTest < Redmine::ControllerTest
     @request.session[:user_id] = 2
 
     assert_difference 'Journal.count' do
-      put(
-        :update,
-        :params => {
-          :id => 1,
-          :issue => {
-            :fixed_version_id => 4,
-            :notes => 'add_notes_conflict_resolution',
-            :lock_version => 2
-          },
-          :conflict_resolution => 'add_notes'
-        }
-      )
+      put :update, :id => 1,
+            :issue => {
+              :fixed_version_id => 4,
+              :notes => 'add_notes_conflict_resolution',
+              :lock_version => 2
+            },
+            :conflict_resolution => 'add_notes'
     end
 
     assert_response 302
@@ -277,32 +212,6 @@ class IssuesControllerTransactionTest < Redmine::ControllerTest
     assert_nil issue.fixed_version_id
     journal = Journal.order('id DESC').first
     assert_equal 'add_notes_conflict_resolution', journal.notes
-    assert_equal false, journal.private_notes
-    assert journal.details.empty?
-  end
-
-  def test_update_stale_issue_with_add_notes_conflict_resolution_should_preserve_private_notes
-    @request.session[:user_id] = 2
-
-    journal = new_record(Journal) do
-      put(
-        :update,
-        :params => {
-          :id => 1,
-          :issue => {
-            :fixed_version_id => 4,
-            :notes => 'add_privates_notes_conflict_resolution',
-            :private_notes => '1',
-            :lock_version => 2
-          },
-          :conflict_resolution => 'add_notes'
-        }
-      )
-    end
-
-    assert_response 302
-    assert_equal 'add_privates_notes_conflict_resolution', journal.notes
-    assert_equal true, journal.private_notes
     assert journal.details.empty?
   end
 
@@ -310,18 +219,13 @@ class IssuesControllerTransactionTest < Redmine::ControllerTest
     @request.session[:user_id] = 2
 
     assert_no_difference 'Journal.count' do
-      put(
-        :update,
-        :params => {
-          :id => 1,
-          :issue => {
-            :fixed_version_id => 4,
-            :notes => 'add_notes_conflict_resolution',
-            :lock_version => 2
-          },
-          :conflict_resolution => 'cancel'
-        }
-      )
+      put :update, :id => 1,
+            :issue => {
+              :fixed_version_id => 4,
+              :notes => 'add_notes_conflict_resolution',
+              :lock_version => 2
+            },
+            :conflict_resolution => 'cancel'
     end
 
     assert_redirected_to '/issues/1'
@@ -333,27 +237,17 @@ class IssuesControllerTransactionTest < Redmine::ControllerTest
     @request.session[:user_id] = 2
 
     assert_no_difference('TimeEntry.count') do
-      put(
-        :update,
-        :params => {
-          :id => 1,
-          :issue => {
-            :subject => ''
-          },
-          :time_entry => {
-            :hours => '2.5',
-            :comments => 'should not be added',
-            :activity_id => TimeEntryActivity.first.id
-          }
-        }
-      )
+      put :update,
+           :id => 1,
+           :issue => { :subject => '' },
+           :time_entry => { :hours => '2.5', :comments => 'should not be added', :activity_id => TimeEntryActivity.first.id }
       assert_response :success
     end
 
-    assert_select 'input[name=?][value=?]', 'time_entry[hours]', '2.50'
+    assert_select 'input[name=?][value=?]', 'time_entry[hours]', '2.5'
     assert_select 'input[name=?][value=?]', 'time_entry[comments]', 'should not be added'
     assert_select 'select[name=?]', 'time_entry[activity_id]' do
-      assert_select 'option[value=?][selected=selected]', TimeEntryActivity.first.id.to_s
+      assert_select 'option[value=?][selected=selected]', TimeEntryActivity.first.id
     end
   end
 
@@ -362,7 +256,7 @@ class IssuesControllerTransactionTest < Redmine::ControllerTest
 
     get :index
     assert_response 500
-    assert_select 'p', :text => /An error occurred/
+    assert_tag 'p', :content => /An error occurred/
     assert_nil session[:query]
     assert_nil session[:issues_index_sort]
   end

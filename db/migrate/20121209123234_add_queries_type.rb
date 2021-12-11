@@ -1,4 +1,4 @@
-class AddQueriesType < ActiveRecord::Migration[4.2]
+class AddQueriesType < ActiveRecord::Migration
   def up
     add_column :queries, :type, :string
   end

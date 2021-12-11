@@ -4,14 +4,15 @@
 
 <table class="list">
 <% @checklist.each do |label, result| %>
-  <tr>
-    <td class="name"><%= label.is_a?(Symbol) ? l(label) : label %></td>
-    <td class="tick"><span class="icon-only <%= (result ? 'icon-ok' : 'icon-error') %>"></span></td>
+  <tr class="<%= cycle 'odd', 'even' %>">
+    <td class="name"><%= l(label) %></td>
+    <td class="tick"><%= image_tag((result ? 'true.png' : 'exclamation.png'),
+                                    :style => "vertical-align:bottom;") %></td>
   </tr>
 <% end %>
 </table>
 <br />
-<div class="box autoscroll">
+<div class="box">
 <pre><%= Redmine::Info.environment %></pre>
 </div>
 

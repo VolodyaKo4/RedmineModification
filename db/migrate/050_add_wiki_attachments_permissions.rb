@@ -1,4 +1,4 @@
-class AddWikiAttachmentsPermissions < ActiveRecord::Migration[4.2]
+class AddWikiAttachmentsPermissions < ActiveRecord::Migration
   # model removed
   class Permission < ActiveRecord::Base; end
 

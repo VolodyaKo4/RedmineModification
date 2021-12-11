@@ -1,4 +1,4 @@
-class AddRoadmapPermission < ActiveRecord::Migration[4.2]
+class AddRoadmapPermission < ActiveRecord::Migration
   # model removed
   class Permission < ActiveRecord::Base; end
 

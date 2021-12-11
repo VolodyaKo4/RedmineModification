@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,11 +17,19 @@
 
 require File.expand_path('../../../test_helper', __FILE__)
 
-class RoutingSysTest < Redmine::RoutingTest
+class RoutingSysTest < ActionController::IntegrationTest
   def test_sys
-    should_route 'GET /sys/projects' => 'sys#projects'
-    should_route 'POST /sys/projects/foo/repository' => 'sys#create_project_repository', :id => 'foo'
-    should_route 'GET /sys/fetch_changesets' => 'sys#fetch_changesets'
-    should_route 'POST /sys/fetch_changesets' => 'sys#fetch_changesets'
+    assert_routing(
+        { :method => 'get', :path => "/sys/projects" },
+        { :controller => 'sys', :action => 'projects' }
+      )
+    assert_routing(
+        { :method => 'post', :path => "/sys/projects/testid/repository" },
+        { :controller => 'sys', :action => 'create_project_repository', :id => 'testid' }
+      )
+    assert_routing(
+        { :method => 'get', :path => "/sys/fetch_changesets" },
+        { :controller => 'sys', :action => 'fetch_changesets' }
+      )
   end
 end

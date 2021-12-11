@@ -1,4 +1,4 @@
-class AddMissingIndexesToCustomFields < ActiveRecord::Migration[4.2]
+class AddMissingIndexesToCustomFields < ActiveRecord::Migration
   def self.up
     add_index :custom_fields, [:id, :type]
   end

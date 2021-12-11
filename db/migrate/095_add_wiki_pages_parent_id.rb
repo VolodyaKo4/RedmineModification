@@ -1,4 +1,4 @@
-class AddWikiPagesParentId < ActiveRecord::Migration[4.2]
+class AddWikiPagesParentId < ActiveRecord::Migration
   def self.up
     add_column :wiki_pages, :parent_id, :integer, :default => nil
   end

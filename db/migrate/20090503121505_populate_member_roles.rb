@@ -1,4 +1,4 @@
-class PopulateMemberRoles < ActiveRecord::Migration[4.2]
+class PopulateMemberRoles < ActiveRecord::Migration
   def self.up
     MemberRole.delete_all
     Member.all.each do |member|

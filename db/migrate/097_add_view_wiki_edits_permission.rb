@@ -1,4 +1,4 @@
-class AddViewWikiEditsPermission < ActiveRecord::Migration[4.2]
+class AddViewWikiEditsPermission < ActiveRecord::Migration
   def self.up
     Role.all.each do |r|
       r.add_permission!(:view_wiki_edits) if r.has_permission?(:view_wiki_pages)

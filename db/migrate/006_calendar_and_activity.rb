@@ -1,4 +1,4 @@
-class CalendarAndActivity < ActiveRecord::Migration[4.2]
+class CalendarAndActivity < ActiveRecord::Migration
   # model removed
   class Permission < ActiveRecord::Base; end
 

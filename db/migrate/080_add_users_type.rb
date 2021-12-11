@@ -1,4 +1,4 @@
-class AddUsersType < ActiveRecord::Migration[4.2]
+class AddUsersType < ActiveRecord::Migration
   def self.up
     add_column :users, :type, :string
     User.update_all "type = 'User'"

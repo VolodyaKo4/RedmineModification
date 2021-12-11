@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,37 +18,25 @@
 class Document < ActiveRecord::Base
   include Redmine::SafeAttributes
   belongs_to :project
-  belongs_to :category, :class_name => "DocumentCategory"
+  belongs_to :category, :class_name => "DocumentCategory", :foreign_key => "category_id"
   acts_as_attachable :delete_permission => :delete_documents
-  acts_as_customizable
 
-  acts_as_searchable :columns => ['title', "#{table_name}.description"],
-                     :preload => :project
-  acts_as_event(
-    :title => Proc.new {|o| "#{l(:label_document)}: #{o.title}"},
-    :author =>
-      Proc.new do |o|
-        o.attachments.reorder("#{Attachment.table_name}.created_on ASC").
-          first.try(:author)
-      end,
-    :url =>
-      Proc.new do |o|
-        {:controller => 'documents', :action => 'show', :id => o.id}
-      end
-  )
-  acts_as_activity_provider :scope => proc {preload(:project)}
+  acts_as_searchable :columns => ['title', "#{table_name}.description"], :include => :project
+  acts_as_event :title => Proc.new {|o| "#{l(:label_document)}: #{o.title}"},
+                :author => Proc.new {|o| o.attachments.reorder("#{Attachment.table_name}.created_on ASC").first.try(:author) },
+                :url => Proc.new {|o| {:controller => 'documents', :action => 'show', :id => o.id}}
+  acts_as_activity_provider :find_options => {:include => :project}
 
   validates_presence_of :project, :title, :category
-  validates_length_of :title, :maximum => 255
+  validates_length_of :title, :maximum => 60
 
-  after_create_commit :send_notification
+  after_create :send_notification
 
-  scope :visible, (lambda do |*args|
-    joins(:project).
-    where(Project.allowed_to_condition(args.shift || User.current, :view_documents, *args))
-  end)
+  scope :visible, lambda {|*args|
+    includes(:project).where(Project.allowed_to_condition(args.shift || User.current, :view_documents, *args))
+  }
 
-  safe_attributes 'category_id', 'title', 'description', 'custom_fields', 'custom_field_values'
+  safe_attributes 'category_id', 'title', 'description'
 
   def visible?(user=User.current)
     !user.nil? && user.allowed_to?(:view_documents, project)
@@ -71,15 +57,11 @@ class Document < ActiveRecord::Base
     @updated_on
   end
 
-  def notified_users
-    project.notified_users.reject {|user| !visible?(user)}
-  end
-
   private
 
   def send_notification
     if Setting.notified_events.include?('document_added')
-      Mailer.deliver_document_added(self, User.current)
+      Mailer.document_added(self).deliver
     end
   end
 end

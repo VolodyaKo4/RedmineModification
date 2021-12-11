@@ -1,4 +1,4 @@
-class UpdateQueriesToSti < ActiveRecord::Migration[4.2]
+class UpdateQueriesToSti < ActiveRecord::Migration
   def up
     ::Query.update_all :type => 'IssueQuery'
   end

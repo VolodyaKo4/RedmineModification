@@ -1,4 +1,4 @@
-class AddCustomFieldsEditable < ActiveRecord::Migration[4.2]
+class AddCustomFieldsEditable < ActiveRecord::Migration
   def self.up
     add_column :custom_fields, :editable, :boolean, :default => true
   end

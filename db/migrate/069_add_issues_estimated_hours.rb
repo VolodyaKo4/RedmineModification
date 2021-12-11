@@ -1,4 +1,4 @@
-class AddIssuesEstimatedHours < ActiveRecord::Migration[4.2]
+class AddIssuesEstimatedHours < ActiveRecord::Migration
   def self.up
     add_column :issues, :estimated_hours, :float
   end

@@ -1,4 +1,4 @@
-class AddMissingIndexesToBoards < ActiveRecord::Migration[4.2]
+class AddMissingIndexesToBoards < ActiveRecord::Migration
   def self.up
     add_index :boards, :last_message_id
   end

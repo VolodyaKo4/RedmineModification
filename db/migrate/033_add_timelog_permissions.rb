@@ -1,4 +1,4 @@
-class AddTimelogPermissions < ActiveRecord::Migration[4.2]
+class AddTimelogPermissions < ActiveRecord::Migration
   # model removed
   class Permission < ActiveRecord::Base; end
 

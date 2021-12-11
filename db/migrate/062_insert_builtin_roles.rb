@@ -1,4 +1,4 @@
-class InsertBuiltinRoles < ActiveRecord::Migration[4.2]
+class InsertBuiltinRoles < ActiveRecord::Migration
   def self.up
     Role.reset_column_information
     nonmember = Role.new(:name => 'Non member', :position => 0)
@@ -11,6 +11,6 @@ class InsertBuiltinRoles < ActiveRecord::Migration[4.2]
   end
 
   def self.down
-    Role.where('builtin <> 0').destroy_all
+    Role.destroy_all 'builtin <> 0'
   end
 end

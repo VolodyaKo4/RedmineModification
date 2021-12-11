@@ -1,4 +1,4 @@
-class AddRepositoriesLogEncoding < ActiveRecord::Migration[4.2]
+class AddRepositoriesLogEncoding < ActiveRecord::Migration
   def self.up
     add_column :repositories, :log_encoding, :string, :limit => 64, :default => nil
   end

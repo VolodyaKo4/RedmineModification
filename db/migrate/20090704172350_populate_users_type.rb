@@ -1,4 +1,4 @@
-class PopulateUsersType < ActiveRecord::Migration[4.2]
+class PopulateUsersType < ActiveRecord::Migration
   def self.up
     Principal.where("type IS NULL").update_all("type = 'User'")
   end

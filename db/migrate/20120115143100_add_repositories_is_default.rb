@@ -1,4 +1,4 @@
-class AddRepositoriesIsDefault < ActiveRecord::Migration[4.2]
+class AddRepositoriesIsDefault < ActiveRecord::Migration
   def self.up
     add_column :repositories, :is_default, :boolean, :default => false
   end

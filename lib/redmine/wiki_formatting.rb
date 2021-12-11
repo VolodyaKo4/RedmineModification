@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -21,7 +19,7 @@ require 'digest/md5'
 
 module Redmine
   module WikiFormatting
-    class StaleSectionError < StandardError; end
+    class StaleSectionError < Exception; end
 
     @@formatters = {}
 
@@ -30,33 +28,18 @@ module Redmine
         yield self
       end
 
-      def register(name, *args)
-        options = args.last.is_a?(Hash) ? args.pop : {}
+      def register(name, formatter, helper, options={})
         name = name.to_s
         raise ArgumentError, "format name '#{name}' is already taken" if @@formatters[name]
-
-        formatter, helper, parser =
-          if args.any?
-            args
-          else
-            %w(Formatter Helper HtmlParser).map {|m| "Redmine::WikiFormatting::#{name.classify}::#{m}".constantize rescue nil}
-          end
-        raise "A formatter class is required" if formatter.nil?
-
         @@formatters[name] = {
           :formatter => formatter,
           :helper => helper,
-          :html_parser => parser,
           :label => options[:label] || name.humanize
         }
       end
 
       def formatter
         formatter_for(Setting.text_formatting)
-      end
-
-      def html_parser
-        html_parser_for(Setting.text_formatting)
       end
 
       def formatter_for(name)
@@ -69,11 +52,6 @@ module Redmine
         (entry && entry[:helper]) || Redmine::WikiFormatting::NullFormatter::Helper
       end
 
-      def html_parser_for(name)
-        entry = @@formatters[name.to_s]
-        (entry && entry[:html_parser]) || Redmine::WikiFormatting::HtmlParser
-      end
-
       def format_names
         @@formatters.keys.map
       end
@@ -83,17 +61,15 @@ module Redmine
       end
 
       def to_html(format, text, options = {})
-        text =
-          if Setting.cache_formatted_text? && text.size > 2.kilobyte && cache_store &&
-              cache_key = cache_key_for(format, text, options[:object], options[:attribute])
-            # Text retrieved from the cache store may be frozen
-            # We need to dup it so we can do in-place substitutions with gsub!
-            cache_store.fetch cache_key do
-              formatter_for(format).new(text).to_html
-            end.dup
-          else
+        text = if Setting.cache_formatted_text? && text.size > 2.kilobyte && cache_store && cache_key = cache_key_for(format, text, options[:object], options[:attribute])
+          # Text retrieved from the cache store may be frozen
+          # We need to dup it so we can do in-place substitutions with gsub!
+          cache_store.fetch cache_key do
             formatter_for(format).new(text).to_html
-          end
+          end.dup
+        else
+          formatter_for(format).new(text).to_html
+        end
         text
       end
 
@@ -118,7 +94,7 @@ module Redmine
     module LinksHelper
       AUTO_LINK_RE = %r{
                       (                          # leading text
-                        <\w+[^>]*?>|             # leading HTML tag, or
+                        <\w+.*?>|                # leading HTML tag, or
                         [\s\(\[,;]|              # leading punctuation, or
                         ^                        # beginning of line
                       )
@@ -131,24 +107,24 @@ module Redmine
                         ([^<]\S*?)               # url
                         (\/)?                    # slash
                       )
-                      ((?:&gt;)?|[^[:alnum:]_\=\/;\(\)\-]*?)             # post
+                      ((?:&gt;)?|[^[:alnum:]_\=\/;\(\)]*?)               # post
                       (?=<|\s|$)
                      }x unless const_defined?(:AUTO_LINK_RE)
 
-      # Destructively replaces urls into clickable links
+      # Destructively remplaces urls into clickable links
       def auto_link!(text)
         text.gsub!(AUTO_LINK_RE) do
           all, leading, proto, url, post = $&, $1, $2, $3, $6
-          if /<a\s/i.match?(leading) || /![<>=]?/.match?(leading)
-            # don't replace URLs that are already linked
-            # and URLs prefixed with ! !> !< != (textile images)
+          if leading =~ /<a\s/i || leading =~ /![<>=]?/
+            # don't replace URL's that are already linked
+            # and URL's prefixed with ! !> !< != (textile images)
             all
           else
-            # Idea below : an URL with unbalanced parenthesis and
+            # Idea below : an URL with unbalanced parethesis and
             # ending by ')' is put into external parenthesis
-            if url[-1] == ")" and ((url.count("(") - url.count(")")) < 0)
-              url = url[0..-2] # discard closing parenthesis from url
-              post = ")" + post # add closing parenthesis to post
+            if ( url[-1]==?) and ((url.count("(") - url.count(")")) < 0 ) )
+              url=url[0..-2] # discard closing parenth from url
+              post = ")"+post # add closing parenth to post
             end
             content = proto + url
             href = "#{proto=="www."?"http://www.":proto}#{url}"
@@ -157,45 +133,17 @@ module Redmine
         end
       end
 
-      # Destructively replaces email addresses into clickable links
+      # Destructively remplaces email addresses into clickable links
       def auto_mailto!(text)
-        text.gsub!(/([\w\.!#\$%\-+.\/]+@[A-Za-z0-9\-]+(\.[A-Za-z0-9\-]+)+)/) do
+        text.gsub!(/([\w\.!#\$%\-+.]+@[A-Za-z0-9\-]+(\.[A-Za-z0-9\-]+)+)/) do
           mail = $1
-          if /<a\b[^>]*>(.*)(#{Regexp.escape(mail)})(.*)<\/a>/.match?(text)
+          if text.match(/<a\b[^>]*>(.*)(#{Regexp.escape(mail)})(.*)<\/a>/)
             mail
           else
             %(<a class="email" href="mailto:#{ERB::Util.html_escape mail}">#{ERB::Util.html_escape mail}</a>).html_safe
           end
         end
-      end
-
-      def restore_redmine_links(html)
-        # restore wiki links eg. [[Foo]]
-        html.gsub!(%r{\[<a href="(.*?)">(.*?)</a>\]}) do
-          "[[#{$2}]]"
-        end
-        # restore Redmine links with double-quotes, eg. version:"1.0"
-        html.gsub!(/(\w):&quot;(.+?)&quot;/) do
-          "#{$1}:\"#{$2}\""
-        end
-        # restore user links with @ in login name eg. [@jsmith@somenet.foo]
-        html.gsub!(%r{[@\A]<a(\sclass="email")? href="mailto:(.*?)">(.*?)</a>}) do
-          "@#{$2}"
-        end
-        # restore user links with @ in login name eg. [user:jsmith@somenet.foo]
-        html.gsub!(%r{\buser:<a(\sclass="email")? href="mailto:(.*?)">(.*?)<\/a>}) do
-          "user:#{$2}"
-        end
-        # restore attachments links with @ in file name eg. [attachment:image@2x.png]
-        html.gsub!(%r{\battachment:<a(\sclass="email")? href="mailto:(.*?)">(.*?)</a>}) do
-          "attachment:#{$2}"
-        end
-        # restore hires images which are misrecognized as email address eg. [printscreen@2x.png]
-        html.gsub!(%r{<a(\sclass="email")? href="mailto:[^"]+@\dx\.(bmp|gif|jpg|jpe|jpeg|png)">(.*?)</a>}) do
-          "#{$3}"
-        end
-        html
-      end
+      end      
     end
 
     # Default formatter module
@@ -214,13 +162,12 @@ module Redmine
           t = CGI::escapeHTML(@text)
           auto_link!(t)
           auto_mailto!(t)
-          restore_redmine_links(t)
           simple_format(t, {}, :sanitize => false)
         end
       end
 
       module Helper
-        def wikitoolbar_for(field_id, preview_url = preview_text_path)
+        def wikitoolbar_for(field_id)
         end
 
         def heads_for_wiki_formatter

@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,11 +18,9 @@
 require File.expand_path('../../test_helper', __FILE__)
 
 class CommentTest < ActiveSupport::TestCase
-  fixtures :users, :email_addresses, :news, :comments, :projects, :enabled_modules,
-           :user_preferences, :roles, :members, :member_roles
+  fixtures :users, :news, :comments, :projects, :enabled_modules
 
   def setup
-    User.current = nil
     @jsmith = User.find(2)
     @news = News.find(1)
   end
@@ -40,7 +36,7 @@ class CommentTest < ActiveSupport::TestCase
     Watcher.create!(:watchable => @news, :user => @jsmith)
 
     with_settings :notified_events => %w(news_comment_added) do
-      assert_difference 'ActionMailer::Base.deliveries.size', 2 do
+      assert_difference 'ActionMailer::Base.deliveries.size' do
         Comment.create!(:commented => @news, :author => @jsmith, :comments => "my comment")
       end
     end

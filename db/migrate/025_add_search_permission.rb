@@ -1,4 +1,4 @@
-class AddSearchPermission < ActiveRecord::Migration[4.2]
+class AddSearchPermission < ActiveRecord::Migration
   # model removed
   class Permission < ActiveRecord::Base; end
 

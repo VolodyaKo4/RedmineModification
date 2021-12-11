@@ -1,4 +1,4 @@
-class AddIndexToSettingsName < ActiveRecord::Migration[4.2]
+class AddIndexToSettingsName < ActiveRecord::Migration
   def self.up
     add_index :settings, :name
   end

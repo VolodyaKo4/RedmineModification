@@ -1,4 +1,4 @@
-class AddQueriesOptions < ActiveRecord::Migration[4.2]
+class AddQueriesOptions < ActiveRecord::Migration
   def up
     add_column :queries, :options, :text
   end

@@ -1,4 +1,4 @@
-class AddActiveFieldToEnumerations < ActiveRecord::Migration[4.2]
+class AddActiveFieldToEnumerations < ActiveRecord::Migration
   def self.up
     add_column :enumerations, :active, :boolean, :default => true, :null => false
   end

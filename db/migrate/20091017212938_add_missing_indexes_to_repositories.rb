@@ -1,4 +1,4 @@
-class AddMissingIndexesToRepositories < ActiveRecord::Migration[4.2]
+class AddMissingIndexesToRepositories < ActiveRecord::Migration
   def self.up
     add_index :repositories, :project_id
   end

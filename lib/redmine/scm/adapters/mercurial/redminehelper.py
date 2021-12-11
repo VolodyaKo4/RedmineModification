@@ -46,21 +46,10 @@ Output example of rhmanifest::
     </rhmanifest>
 """
 import re, time, cgi, urllib
-from mercurial import cmdutil, commands, node, error, hg, registrar
-
-cmdtable = {}
-command = registrar.command(cmdtable) if hasattr(registrar, 'command') else cmdutil.command(cmdtable)
+from mercurial import cmdutil, commands, node, error, hg
 
 _x = cgi.escape
 _u = lambda s: cgi.escape(urllib.quote(s))
-
-def _changectx(repo, rev):
-    if isinstance(rev, str):
-       rev = repo.lookup(rev)
-    if hasattr(repo, 'changectx'):
-        return repo.changectx(rev)
-    else:
-        return repo[rev]
 
 def _tip(ui, repo):
     # see mercurial/commands.py:tip
@@ -69,7 +58,7 @@ def _tip(ui, repo):
             return len(repo) - 1
         except TypeError:  # Mercurial < 1.1
             return repo.changelog.count() - 1
-    tipctx = _changectx(repo, tiprev())
+    tipctx = repo.changectx(tiprev())
     ui.write('<tip revision="%d" node="%s"/>\n'
              % (tipctx.rev(), _x(node.hex(tipctx.node()))))
 
@@ -85,7 +74,7 @@ def _tags(ui, repo):
         except error.LookupError:
             continue
         ui.write('<tag revision="%d" node="%s" name="%s"/>\n'
-                 % (r, _x(node.hex(n)), _u(t)))
+                 % (r, _x(node.hex(n)), _x(t)))
 
 def _branches(ui, repo):
     # see mercurial/commands.py:branches
@@ -102,18 +91,13 @@ def _branches(ui, repo):
             return repo.branchheads(branch, closed=False)
         except TypeError:  # Mercurial < 1.2
             return repo.branchheads(branch)
-    def lookup(rev, n):
-        try:
-            return repo.lookup(rev)
-        except RuntimeError:
-            return n
     for t, n, r in sorted(iterbranches(), key=lambda e: e[2], reverse=True):
-        if lookup(r, n) in branchheads(t):
+        if repo.lookup(r) in branchheads(t):
             ui.write('<branch revision="%d" node="%s" name="%s"/>\n'
-                     % (r, _x(node.hex(n)), _u(t)))
+                     % (r, _x(node.hex(n)), _x(t)))
 
 def _manifest(ui, repo, path, rev):
-    ctx = _changectx(repo, rev)
+    ctx = repo.changectx(rev)
     ui.write('<manifest revision="%d" path="%s">\n'
              % (ctx.rev(), _u(path)))
 
@@ -140,40 +124,81 @@ def _manifest(ui, repo, path, rev):
 
     ui.write('</manifest>\n')
 
-@command('rhannotate',
-         [('r', 'rev', '', 'revision'),
-          ('u', 'user', None, 'list the author (long with -v)'),
-          ('n', 'number', None, 'list the revision number (default)'),
-          ('c', 'changeset', None, 'list the changeset'),
-         ],
-         'hg rhannotate [-r REV] [-u] [-n] [-c] FILE...')
 def rhannotate(ui, repo, *pats, **opts):
     rev = urllib.unquote_plus(opts.pop('rev', None))
     opts['rev'] = rev
     return commands.annotate(ui, repo, *map(urllib.unquote_plus, pats), **opts)
 
-@command('rhcat',
-               [('r', 'rev', '', 'revision')],
-               'hg rhcat ([-r REV] ...) FILE...')
 def rhcat(ui, repo, file1, *pats, **opts):
     rev = urllib.unquote_plus(opts.pop('rev', None))
     opts['rev'] = rev
     return commands.cat(ui, repo, urllib.unquote_plus(file1), *map(urllib.unquote_plus, pats), **opts)
 
-@command('rhdiff',
-               [('r', 'rev', [], 'revision'),
-                ('c', 'change', '', 'change made by revision')],
-               'hg rhdiff ([-c REV] | [-r REV] ...) [FILE]...')
 def rhdiff(ui, repo, *pats, **opts):
     """diff repository (or selected files)"""
     change = opts.pop('change', None)
     if change:  # add -c option for Mercurial<1.1
-        base = _changectx(repo, change).parents()[0].rev()
+        base = repo.changectx(change).parents()[0].rev()
         opts['rev'] = [str(base), change]
     opts['nodates'] = True
     return commands.diff(ui, repo, *map(urllib.unquote_plus, pats), **opts)
 
-@command('rhlog',
+def rhlog(ui, repo, *pats, **opts):
+    rev      = opts.pop('rev')
+    bra0     = opts.pop('branch')
+    from_rev = urllib.unquote_plus(opts.pop('from', None))
+    to_rev   = urllib.unquote_plus(opts.pop('to'  , None))
+    bra      = urllib.unquote_plus(opts.pop('rhbranch', None))
+    from_rev = from_rev.replace('"', '\\"')
+    to_rev   = to_rev.replace('"', '\\"')
+    if hg.util.version() >= '1.6':
+      opts['rev'] = ['"%s":"%s"' % (from_rev, to_rev)]
+    else:
+      opts['rev'] = ['%s:%s' % (from_rev, to_rev)]
+    opts['branch'] = [bra]
+    return commands.log(ui, repo, *map(urllib.unquote_plus, pats), **opts)
+
+def rhmanifest(ui, repo, path='', **opts):
+    """output the sub-manifest of the specified directory"""
+    ui.write('<?xml version="1.0"?>\n')
+    ui.write('<rhmanifest>\n')
+    ui.write('<repository root="%s">\n' % _u(repo.root))
+    try:
+        _manifest(ui, repo, urllib.unquote_plus(path), urllib.unquote_plus(opts.get('rev')))
+    finally:
+        ui.write('</repository>\n')
+        ui.write('</rhmanifest>\n')
+
+def rhsummary(ui, repo, **opts):
+    """output the summary of the repository"""
+    ui.write('<?xml version="1.0"?>\n')
+    ui.write('<rhsummary>\n')
+    ui.write('<repository root="%s">\n' % _u(repo.root))
+    try:
+        _tip(ui, repo)
+        _tags(ui, repo)
+        _branches(ui, repo)
+        # TODO: bookmarks in core (Mercurial>=1.8)
+    finally:
+        ui.write('</repository>\n')
+        ui.write('</rhsummary>\n')
+
+cmdtable = {
+    'rhannotate': (rhannotate,
+         [('r', 'rev', '', 'revision'),
+          ('u', 'user', None, 'list the author (long with -v)'),
+          ('n', 'number', None, 'list the revision number (default)'),
+          ('c', 'changeset', None, 'list the changeset'),
+         ],
+         'hg rhannotate [-r REV] [-u] [-n] [-c] FILE...'),
+    'rhcat': (rhcat,
+               [('r', 'rev', '', 'revision')],
+               'hg rhcat ([-r REV] ...) FILE...'),
+    'rhdiff': (rhdiff,
+               [('r', 'rev', [], 'revision'),
+                ('c', 'change', '', 'change made by revision')],
+               'hg rhdiff ([-c REV] | [-r REV] ...) [FILE]...'),
+    'rhlog': (rhlog,
                    [
                     ('r', 'rev', [], 'show the specified revision'),
                     ('b', 'branch', [],
@@ -192,48 +217,9 @@ def rhdiff(ui, repo, *pats, **opts):
                       ''),
                     ('', 'template', '',
                        'display with template')],
-                   'hg rhlog [OPTION]... [FILE]')
-def rhlog(ui, repo, *pats, **opts):
-    rev      = opts.pop('rev')
-    bra0     = opts.pop('branch')
-    from_rev = urllib.unquote_plus(opts.pop('from', None))
-    to_rev   = urllib.unquote_plus(opts.pop('to'  , None))
-    bra      = urllib.unquote_plus(opts.pop('rhbranch', None))
-    from_rev = from_rev.replace('"', '\\"')
-    to_rev   = to_rev.replace('"', '\\"')
-    if hg.util.version() >= '1.6':
-      opts['rev'] = ['"%s":"%s"' % (from_rev, to_rev)]
-    else:
-      opts['rev'] = ['%s:%s' % (from_rev, to_rev)]
-    opts['branch'] = [bra]
-    return commands.log(ui, repo, *map(urllib.unquote_plus, pats), **opts)
-
-@command('rhmanifest',
+                   'hg rhlog [OPTION]... [FILE]'),
+    'rhmanifest': (rhmanifest,
                    [('r', 'rev', '', 'show the specified revision')],
-                   'hg rhmanifest [-r REV] [PATH]')
-def rhmanifest(ui, repo, path='', **opts):
-    """output the sub-manifest of the specified directory"""
-    ui.write('<?xml version="1.0"?>\n')
-    ui.write('<rhmanifest>\n')
-    ui.write('<repository root="%s">\n' % _u(repo.root))
-    try:
-        _manifest(ui, repo, urllib.unquote_plus(path), urllib.unquote_plus(opts.get('rev')))
-    finally:
-        ui.write('</repository>\n')
-        ui.write('</rhmanifest>\n')
-
-@command('rhsummary',[], 'hg rhsummary')
-def rhsummary(ui, repo, **opts):
-    """output the summary of the repository"""
-    ui.write('<?xml version="1.0"?>\n')
-    ui.write('<rhsummary>\n')
-    ui.write('<repository root="%s">\n' % _u(repo.root))
-    try:
-        _tip(ui, repo)
-        _tags(ui, repo)
-        _branches(ui, repo)
-        # TODO: bookmarks in core (Mercurial>=1.8)
-    finally:
-        ui.write('</repository>\n')
-        ui.write('</rhsummary>\n')
-
+                   'hg rhmanifest [-r REV] [PATH]'),
+    'rhsummary': (rhsummary, [], 'hg rhsummary'),
+}

@@ -1,4 +1,4 @@
-class RemoveIssueStatusesHtmlColor < ActiveRecord::Migration[4.2]
+class RemoveIssueStatusesHtmlColor < ActiveRecord::Migration
   def self.up
     remove_column :issue_statuses, :html_color
   end

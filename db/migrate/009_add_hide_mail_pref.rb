@@ -1,4 +1,4 @@
-class AddHideMailPref < ActiveRecord::Migration[4.2]
+class AddHideMailPref < ActiveRecord::Migration
   def self.up
     add_column :user_preferences, :hide_mail, :boolean, :default => false
   end

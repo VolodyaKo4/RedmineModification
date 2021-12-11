@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -25,7 +23,6 @@ module Redmine
       include ERB::Util
       include ActionView::Helpers::TagHelper
       include ActionView::Helpers::TextHelper
-      include ActionView::Helpers::OutputSafetyHelper
       attr_reader :diff, :words
 
       def initialize(content_to, content_from)
@@ -46,7 +43,7 @@ module Redmine
           add_at = nil
           add_to = nil
           del_at = nil
-          deleted = +""
+          deleted = ""
           diff.each do |change|
             pos = change[1]
             if change[0] == "+"
@@ -56,7 +53,7 @@ module Redmine
             else
               del_at = pos unless del_at
               deleted << ' ' unless deleted.empty?
-              deleted << change[2]
+              deleted << h(change[2])
               words_del  += 1
             end
           end
@@ -65,14 +62,13 @@ module Redmine
             words[add_to] = words[add_to] + '</span>'.html_safe
           end
           if del_at
-            # deleted is not safe html at this point
-            words.insert del_at - del_off + dels + words_add, '<span class="diff_out">'.html_safe + h(deleted) + '</span>'.html_safe
+            words.insert del_at - del_off + dels + words_add, '<span class="diff_out">'.html_safe + deleted + '</span>'.html_safe
             dels += 1
             del_off += words_del
             words_del = 0
           end
         end
-        safe_join(words, ' ')
+        words.join(' ').html_safe
       end
     end
   end

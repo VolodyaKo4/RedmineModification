@@ -61,7 +61,7 @@ module OpenIdAuthentication
       @code
     end
 
-    ERROR_MESSAGES.each_key { |state| define_method("#{state}?") { @code == state } }
+    ERROR_MESSAGES.keys.each { |state| define_method("#{state}?") { @code == state } }
 
     def successful?
       @code == :successful
@@ -87,7 +87,7 @@ module OpenIdAuthentication
     # dodge XRIs -- TODO: validate, don't just skip.
     unless ['=', '@', '+', '$', '!', '('].include?(identifier.at(0))
       # does it begin with http?  if not, add it.
-      identifier = +"http://#{identifier}" unless /^http/i.match?(identifier)
+      identifier = "http://#{identifier}" unless identifier =~ /^http/i
 
       # strip any fragments
       identifier.gsub!(/\#(.*)$/, '')
@@ -109,12 +109,12 @@ module OpenIdAuthentication
     # the Rails convention "open_id_identifier" because that's what
     # the specification dictates in order to get browser auto-complete
     # working across sites
-    def using_open_id?(identifier = nil)
+    def using_open_id?(identifier = nil) #:doc:
       identifier ||= open_id_identifier
       !identifier.blank? || request.env[Rack::OpenID::RESPONSE]
     end
 
-    def authenticate_with_open_id(identifier = nil, options = {}, &block)
+    def authenticate_with_open_id(identifier = nil, options = {}, &block) #:doc:
       identifier ||= open_id_identifier
 
       if request.env[Rack::OpenID::RESPONSE]

@@ -119,12 +119,6 @@
         circular_dependency: "Denne relasjonen ville lagd en sirkulær avhengighet"
         cant_link_an_issue_with_a_descendant: "En sak kan ikke kobles mot en av sine undersaker"
         earlier_than_minimum_start_date: "cannot be earlier than %{date} because of preceding issues"
-        not_a_regexp: "is not a valid regular expression"
-        open_issue_with_closed_parent: "An open issue cannot be attached to a closed parent task"
-        must_contain_uppercase: "must contain uppercase letters (A-Z)"
-        must_contain_lowercase: "must contain lowercase letters (a-z)"
-        must_contain_digits: "must contain digits (0-9)"
-        must_contain_special_chars: "must contain special characters (!, $, %, ...)"
 
 
   actionview_instancetag_blank_option: Vennligst velg
@@ -137,12 +131,11 @@
   general_csv_separator: ','
   general_csv_decimal_separator: '.'
   general_csv_encoding: ISO-8859-1
-  general_pdf_fontname: freesans
-  general_pdf_monospaced_fontname: freemono
+  general_pdf_encoding: UTF-8
   general_first_day_of_week: '1'
 
   notice_account_updated: Kontoen er oppdatert.
-  notice_account_invalid_credentials: Feil brukernavn eller passord
+  notice_account_invalid_creditentials: Feil brukernavn eller passord
   notice_account_password_updated: Passordet er oppdatert.
   notice_account_wrong_password: Feil passord
   notice_account_register_done: Kontoen er opprettet. Klikk lenken som er sendt deg i e-post for å aktivere kontoen.
@@ -161,6 +154,7 @@
   notice_email_error: "En feil oppstod under sending av e-post (%{value})"
   notice_feeds_access_key_reseted: Din Atom-tilgangsnøkkel er nullstilt.
   notice_failed_to_save_issues: "Lykkes ikke å lagre %{count} sak(er) på %{total} valgt: %{ids}."
+  notice_no_issue_selected: "Ingen sak valgt! Vennligst merk sakene du vil endre."
   notice_account_pending: "Din konto ble opprettet og avventer nå administrativ godkjenning."
   notice_default_data_loaded: Standardkonfigurasjonen lastet inn.
 
@@ -267,6 +261,7 @@
   field_comments_sorting: Vis kommentarer
 
   setting_app_title: Applikasjonstittel
+  setting_app_subtitle: Applikasjonens undertittel
   setting_welcome_text: Velkomsttekst
   setting_default_language: Standardspråk
   setting_login_required: Krever innlogging
@@ -353,6 +348,7 @@
   label_enumeration_new: Ny verdi
   label_information: Informasjon
   label_information_plural: Informasjon
+  label_please_login: Vennlist logg inn
   label_register: Registrer
   label_password_lost: Mistet passord
   label_home: Hjem
@@ -368,6 +364,7 @@
   label_last_login: Sist innlogget
   label_registered_on: Registrert
   label_activity: Aktivitet
+  label_overall_activity: All aktivitet
   label_new: Ny
   label_logged_as: Innlogget som
   label_environment: Miljø
@@ -416,6 +413,10 @@
   label_open_issues_plural: åpne
   label_closed_issues: lukket
   label_closed_issues_plural: lukkede
+  label_x_open_issues_abbr_on_total:
+    zero:  0 åpne / %{total}
+    one:   1 åpen / %{total}
+    other: "%{count} åpne / %{total}"
   label_x_open_issues_abbr:
     zero:  0 åpne
     one:   1 åpen
@@ -436,12 +437,14 @@
   label_used_by: Brukt av
   label_details: Detaljer
   label_add_note: Legg til notat
+  label_per_page: Pr. side
   label_calendar: Kalender
   label_months_from: måneder fra
   label_gantt: Gantt
   label_internal: Intern
   label_last_changes: "siste %{count} endringer"
   label_change_view_all: Vis alle endringer
+  label_personalize_page: Tilpass denne siden
   label_comment: Kommentar
   label_comment_plural: Kommentarer
   label_x_comments:
@@ -462,6 +465,7 @@
   label_in_more_than: in mer enn
   label_in: i
   label_today: idag
+  label_all_time: all tid
   label_yesterday: i går
   label_this_week: denne uken
   label_last_week: sist uke
@@ -539,6 +543,10 @@
   label_blocked_by: blokkert av
   label_precedes: kommer før
   label_follows: følger
+  label_end_to_start: slutt til start
+  label_end_to_end: slutt til slutt
+  label_start_to_start: start til start
+  label_start_to_end: start til slutt
   label_stay_logged_in: Hold meg innlogget
   label_disabled: avslått
   label_show_completed_versions: Vis ferdige versjoner
@@ -584,6 +592,7 @@
   label_age: Alder
   label_change_properties: Endre egenskaper
   label_general: Generell
+  label_more: Mer
   label_scm: SCM
   label_plugins: Tillegg
   label_ldap_authentication: LDAP-autentisering
@@ -593,6 +602,7 @@
   label_preferences: Brukerinnstillinger
   label_chronological_order: I kronologisk rekkefølge
   label_reverse_chronological_order: I omvendt kronologisk rekkefølge
+  label_planning: Planlegging
 
   button_login: Logg inn
   button_submit: Send
@@ -638,6 +648,7 @@
 
   text_select_mail_notifications: Velg hendelser som skal varsles med e-post.
   text_regexp_info: f.eks. ^[A-Z0-9]+$
+  text_min_max_length_info: 0 betyr ingen begrensning
   text_project_destroy_confirmation: Er du sikker på at du vil slette dette prosjekter og alle relatert data ?
   text_subprojects_destroy_warning: "Underprojekt(ene): %{value} vil også bli slettet."
   text_workflow_edit: Velg en rolle og en sakstype for å endre arbeidsflyten
@@ -666,13 +677,12 @@
   text_select_project_modules: 'Velg moduler du vil aktivere for dette prosjektet:'
   text_default_administrator_account_changed: Standard administrator-konto er endret
   text_file_repository_writable: Fil-arkivet er skrivbart
-  text_minimagick_available: MiniMagick er tilgjengelig (valgfritt)
+  text_rmagick_available: RMagick er tilgjengelig (valgfritt)
   text_destroy_time_entries_question: "%{hours} timer er ført på sakene du er i ferd med å slette. Hva vil du gjøre ?"
   text_destroy_time_entries: Slett førte timer
   text_assign_time_entries_to_project: Overfør førte timer til prosjektet
   text_reassign_time_entries: 'Overfør førte timer til denne saken:'
   text_user_wrote: "%{value} skrev:"
-  text_user_wrote_in: "%{value} skrev (%{link}):"
 
   default_role_manager: Leder
   default_role_developer: Utvikler
@@ -732,6 +742,7 @@
   permission_edit_wiki_pages: Redigere wiki-sider
   permission_add_issue_watchers: Legge til overvåkere
   permission_view_gantt: Vise gantt-diagram
+  permission_move_issues: Flytte saker
   permission_manage_issue_relations: Administrere saksrelasjoner
   permission_delete_wiki_pages: Slette wiki-sider
   permission_manage_boards: Administrere forum
@@ -831,6 +842,7 @@
   label_version_sharing_tree: Med prosjekt-tre
   label_version_sharing_none: Ikke delt
   error_can_not_archive_project: Dette prosjektet kan ikke arkiveres
+  button_duplicate: Duplikat
   button_copy_and_follow: Kopier og følg etter
   label_copy_source: Kilde
   setting_issue_done_ratio: Kalkuler ferdigstillingsprosent ut i fra
@@ -868,7 +880,7 @@
   permission_export_wiki_pages: Eksporter wiki-sider
   setting_cache_formatted_text: Mellomlagre formattert tekst
   permission_manage_project_activities: Administrere prosjektaktiviteter
-  error_unable_delete_issue_status: Kan ikke slette saksstatus (%{value})
+  error_unable_delete_issue_status: Kan ikke slette saksstatus
   label_profile: Profil
   permission_manage_subtasks: Administrere undersaker
   field_parent_issue: Overordnet sak
@@ -879,17 +891,21 @@
   error_can_not_remove_role: Denne rollen er i bruk og kan ikke slettes.
   error_can_not_delete_tracker: Denne sakstypen inneholder saker og kan ikke slettes.
   field_principal: Principal
+  label_my_page_block: Min side felt
   notice_failed_to_save_members: "Feil ved lagring av medlem(mer): %{errors}."
   text_zoom_out: Zoom ut
   text_zoom_in: Zoom inn
   notice_unable_delete_time_entry: Kan ikke slette oppføring fra timeliste.
+  label_overall_spent_time: All tidsbruk
   field_time_entries: Loggfør tid
   project_module_gantt: Gantt
   project_module_calendar: Kalender
   button_edit_associated_wikipage: "Rediger tilhørende Wiki-side: %{page_title}"
   field_text: Tekstfelt
+  label_user_mail_option_only_owner: Kun for ting jeg eier
   setting_default_notification_option: Standardvalg for varslinger
   label_user_mail_option_only_my_events: Kun for ting jeg overvåker eller er involvert i
+  label_user_mail_option_only_assigned: Kun for ting jeg er tildelt
   label_user_mail_option_none: Ingen hendelser
   field_member_of_group: Den tildeltes gruppe
   field_assigned_to_role: Den tildeltes rolle
@@ -952,12 +968,16 @@
   description_project_scope: Search scope
   description_filter: Filter
   description_user_mail_notification: Mail notification settings
+  description_date_from: Oppgi startdato
   description_message_content: Meldingsinnhold
   description_available_columns: Tilgjengelige kolonner
+  description_date_range_interval: Velg datointervall ved å spesifisere start- og sluttdato
   description_issue_category_reassign: Choose issue category
   description_search: Søkefelt
   description_notes: Notes
+  description_date_range_list: Choose range from list
   description_choose_project: Prosjekter
+  description_date_to: Oppgi sluttdato
   description_query_sort_criteria_attribute: Sort attribute
   description_wiki_subpages_reassign: Velg ny overordnet side
   description_selected_columns: Valgte kolonner
@@ -1003,6 +1023,7 @@
   setting_session_timeout: Økten er avsluttet på grunn av inaktivitet
   label_session_expiration: Økten er avsluttet
   permission_close_project: Close / reopen the project
+  label_show_closed_projects: View closed projects
   button_close: Close
   button_reopen: Reopen
   project_status_active: active
@@ -1081,324 +1102,3 @@
     users
   label_custom_field_select_type: Select the type of object to which the custom field
     is to be attached
-  label_issue_assigned_to_updated: Assignee updated
-  label_check_for_updates: Check for updates
-  label_latest_compatible_version: Latest compatible version
-  label_unknown_plugin: Unknown plugin
-  label_radio_buttons: radio buttons
-  label_group_anonymous: Anonymous users
-  label_group_non_member: Non member users
-  label_add_projects: Add projects
-  field_default_status: Default status
-  text_subversion_repository_note: 'Examples: file:///, http://, https://, svn://, svn+[tunnelscheme]://'
-  field_users_visibility: Users visibility
-  label_users_visibility_all: All active users
-  label_users_visibility_members_of_visible_projects: Members of visible projects
-  label_edit_attachments: Edit attached files
-  setting_link_copied_issue: Link issues on copy
-  label_link_copied_issue: Link copied issue
-  label_ask: Ask
-  label_search_attachments_yes: Search attachment filenames and descriptions
-  label_search_attachments_no: Do not search attachments
-  label_search_attachments_only: Search attachments only
-  label_search_open_issues_only: Open issues only
-  field_address: E-post
-  setting_max_additional_emails: Maximum number of additional email addresses
-  label_email_address_plural: Emails
-  label_email_address_add: Add email address
-  label_enable_notifications: Enable notifications
-  label_disable_notifications: Disable notifications
-  setting_search_results_per_page: Search results per page
-  label_blank_value: blank
-  permission_copy_issues: Copy issues
-  error_password_expired: Your password has expired or the administrator requires you
-    to change it.
-  field_time_entries_visibility: Time logs visibility
-  setting_password_max_age: Require password change after
-  label_parent_task_attributes: Parent tasks attributes
-  label_parent_task_attributes_derived: Calculated from subtasks
-  label_parent_task_attributes_independent: Independent of subtasks
-  label_time_entries_visibility_all: All time entries
-  label_time_entries_visibility_own: Time entries created by the user
-  label_member_management: Member management
-  label_member_management_all_roles: All roles
-  label_member_management_selected_roles_only: Only these roles
-  label_password_required: Confirm your password to continue
-  label_total_spent_time: All tidsbruk
-  notice_import_finished: "%{count} items have been imported"
-  notice_import_finished_with_errors: "%{count} out of %{total} items could not be imported"
-  error_invalid_file_encoding: The file is not a valid %{encoding} encoded file
-  error_invalid_csv_file_or_settings: The file is not a CSV file or does not match the
-    settings below (%{value})
-  error_can_not_read_import_file: An error occurred while reading the file to import
-  permission_import_issues: Import issues
-  label_import_issues: Import issues
-  label_select_file_to_import: Select the file to import
-  label_fields_separator: Field separator
-  label_fields_wrapper: Field wrapper
-  label_encoding: Encoding
-  label_comma_char: Comma
-  label_semi_colon_char: Semicolon
-  label_quote_char: Quote
-  label_double_quote_char: Double quote
-  label_fields_mapping: Fields mapping
-  label_file_content_preview: File content preview
-  label_create_missing_values: Create missing values
-  button_import: Import
-  field_total_estimated_hours: Total estimated time
-  label_api: API
-  label_total_plural: Totals
-  label_assigned_issues: Assigned issues
-  label_field_format_enumeration: Key/value list
-  label_f_hour_short: '%{value} h'
-  field_default_version: Default version
-  error_attachment_extension_not_allowed: Attachment extension %{extension} is not allowed
-  setting_attachment_extensions_allowed: Allowed extensions
-  setting_attachment_extensions_denied: Disallowed extensions
-  label_any_open_issues: any open issues
-  label_no_open_issues: no open issues
-  label_default_values_for_new_users: Default values for new users
-  error_ldap_bind_credentials: Invalid LDAP Account/Password
-  setting_sys_api_key: API-nøkkel
-  setting_lost_password: Mistet passord
-  mail_subject_security_notification: Security notification
-  mail_body_security_notification_change: ! '%{field} was changed.'
-  mail_body_security_notification_change_to: ! '%{field} was changed to %{value}.'
-  mail_body_security_notification_add: ! '%{field} %{value} was added.'
-  mail_body_security_notification_remove: ! '%{field} %{value} was removed.'
-  mail_body_security_notification_notify_enabled: Email address %{value} now receives
-    notifications.
-  mail_body_security_notification_notify_disabled: Email address %{value} no longer
-    receives notifications.
-  mail_body_settings_updated: ! 'The following settings were changed:'
-  field_remote_ip: IP address
-  label_wiki_page_new: New wiki page
-  label_relations: Relations
-  button_filter: Filter
-  mail_body_password_updated: Your password has been changed.
-  label_no_preview: No preview available
-  error_no_tracker_allowed_for_new_issue_in_project: The project doesn't have any trackers
-    for which you can create an issue
-  label_tracker_all: All trackers
-  label_new_project_issue_tab_enabled: Display the "New issue" tab
-  setting_new_item_menu_tab: Project menu tab for creating new objects
-  label_new_object_tab_enabled: Display the "+" drop-down
-  error_no_projects_with_tracker_allowed_for_new_issue: There are no projects with trackers
-    for which you can create an issue
-  field_textarea_font: Font used for text areas
-  label_font_default: Default font
-  label_font_monospace: Monospaced font
-  label_font_proportional: Proportional font
-  setting_timespan_format: Time span format
-  label_table_of_contents: Table of contents
-  setting_commit_logs_formatting: Apply text formatting to commit messages
-  setting_mail_handler_enable_regex: Enable regular expressions
-  error_move_of_child_not_possible: 'Subtask %{child} could not be moved to the new
-    project: %{errors}'
-  error_cannot_reassign_time_entries_to_an_issue_about_to_be_deleted: Spent time cannot
-    be reassigned to an issue that is about to be deleted
-  setting_timelog_required_fields: Required fields for time logs
-  label_attribute_of_object: '%{object_name}''s %{name}'
-  label_user_mail_option_only_assigned: Only for things I watch or I am assigned to
-  label_user_mail_option_only_owner: Only for things I watch or I am the owner of
-  warning_fields_cleared_on_bulk_edit: Changes will result in the automatic deletion
-    of values from one or more fields on the selected objects
-  field_updated_by: Updated by
-  field_last_updated_by: Last updated by
-  field_full_width_layout: Full width layout
-  label_last_notes: Last notes
-  field_digest: Checksum
-  field_default_assigned_to: Default assignee
-  setting_show_custom_fields_on_registration: Show custom fields on registration
-  permission_view_news: View news
-  label_no_preview_alternative_html: No preview available. %{link} the file instead.
-  label_no_preview_download: Download
-  setting_close_duplicate_issues: Close duplicate issues automatically
-  error_exceeds_maximum_hours_per_day: Cannot log more than %{max_hours} hours on the
-    same day (%{logged_hours} hours have already been logged)
-  setting_time_entry_list_defaults: Timelog list defaults
-  setting_timelog_accept_0_hours: Accept time logs with 0 hours
-  setting_timelog_max_hours_per_day: Maximum hours that can be logged per day and user
-  label_x_revisions: "%{count} revisions"
-  error_can_not_delete_auth_source: This authentication mode is in use and cannot be
-    deleted.
-  button_actions: Actions
-  mail_body_lost_password_validity: Please be aware that you may change the password
-    only once using this link.
-  text_login_required_html: When not requiring authentication, public projects and their
-    contents are openly available on the network. You can <a href="%{anonymous_role_path}">edit
-    the applicable permissions</a>.
-  label_login_required_yes: 'Yes'
-  label_login_required_no: No, allow anonymous access to public projects
-  text_project_is_public_non_member: Public projects and their contents are available
-    to all logged-in users.
-  text_project_is_public_anonymous: Public projects and their contents are openly available
-    on the network.
-  label_version_and_files: Versions (%{count}) and Files
-  label_ldap: LDAP
-  label_ldaps_verify_none: LDAPS (without certificate check)
-  label_ldaps_verify_peer: LDAPS
-  label_ldaps_warning: It is recommended to use an encrypted LDAPS connection with certificate
-    check to prevent any manipulation during the authentication process.
-  label_nothing_to_preview: Nothing to preview
-  error_token_expired: This password recovery link has expired, please try again.
-  error_spent_on_future_date: Cannot log time on a future date
-  setting_timelog_accept_future_dates: Accept time logs on future dates
-  label_delete_link_to_subtask: Slett relasjon
-  error_not_allowed_to_log_time_for_other_users: You are not allowed to log time
-    for other users
-  permission_log_time_for_other_users: Log spent time for other users
-  label_tomorrow: tomorrow
-  label_next_week: next week
-  label_next_month: next month
-  text_role_no_workflow: No workflow defined for this role
-  text_status_no_workflow: No tracker uses this status in the workflows
-  setting_mail_handler_preferred_body_part: Preferred part of multipart (HTML) emails
-  setting_show_status_changes_in_mail_subject: Show status changes in issue mail notifications
-    subject
-  label_inherited_from_parent_project: Inherited from parent project
-  label_inherited_from_group: Inherited from group %{name}
-  label_trackers_description: Trackers description
-  label_open_trackers_description: View all trackers description
-  label_preferred_body_part_text: Text
-  label_preferred_body_part_html: HTML (experimental)
-  field_parent_issue_subject: Parent task subject
-  permission_edit_own_issues: Edit own issues
-  text_select_apply_tracker: Select tracker
-  label_updated_issues: Updated issues
-  text_avatar_server_config_html: The current avatar server is <a href="%{url}">%{url}</a>.
-    You can configure it in config/configuration.yml.
-  setting_gantt_months_limit: Maximum number of months displayed on the gantt chart
-  permission_import_time_entries: Import time entries
-  label_import_notifications: Send email notifications during the import
-  text_gs_available: ImageMagick PDF support available (optional)
-  field_recently_used_projects: Number of recently used projects in jump box
-  label_optgroup_bookmarks: Bookmarks
-  label_optgroup_others: Other projects
-  label_optgroup_recents: Recently used
-  button_project_bookmark: Add bookmark
-  button_project_bookmark_delete: Remove bookmark
-  field_history_default_tab: Issue's history default tab
-  label_issue_history_properties: Property changes
-  label_issue_history_notes: Notes
-  label_last_tab_visited: Last visited tab
-  field_unique_id: Unique ID
-  text_no_subject: no subject
-  setting_password_required_char_classes: Required character classes for passwords
-  label_password_char_class_uppercase: uppercase letters
-  label_password_char_class_lowercase: lowercase letters
-  label_password_char_class_digits: digits
-  label_password_char_class_special_chars: special characters
-  text_characters_must_contain: Must contain %{character_classes}.
-  label_starts_with: starts with
-  label_ends_with: ends with
-  label_issue_fixed_version_updated: Target version updated
-  setting_project_list_defaults: Projects list defaults
-  label_display_type: Display results as
-  label_display_type_list: List
-  label_display_type_board: Board
-  label_my_bookmarks: My bookmarks
-  label_import_time_entries: Import time entries
-  field_toolbar_language_options: Code highlighting toolbar languages
-  label_user_mail_notify_about_high_priority_issues_html: Also notify me about issues
-    with a priority of <em>%{prio}</em> or higher
-  label_assign_to_me: Assign to me
-  notice_issue_not_closable_by_open_tasks: This issue cannot be closed because it has
-    at least one open subtask.
-  notice_issue_not_closable_by_blocking_issue: This issue cannot be closed because it
-    is blocked by at least one open issue.
-  notice_issue_not_reopenable_by_closed_parent_issue: This issue cannot be reopened
-    because its parent issue is closed.
-  error_bulk_download_size_too_big: These attachments cannot be bulk downloaded because
-    the total file size exceeds the maximum allowed size (%{max_size})
-  setting_bulk_download_max_size: Maximum total size for bulk download
-  label_download_all_attachments: Download all files
-  error_attachments_too_many: This file cannot be uploaded because it exceeds the maximum
-    number of files that can be attached simultaneously (%{max_number_of_files})
-  setting_email_domains_allowed: Allowed email domains
-  setting_email_domains_denied: Disallowed email domains
-  field_passwd_changed_on: Password last changed
-  label_relations_mapping: Relations mapping
-  label_import_users: Import users
-  label_days_to_html: "%{days} days up to %{date}"
-  setting_twofa: Two-factor authentication
-  label_optional: optional
-  label_required_lower: required
-  button_disable: Disable
-  twofa__totp__name: Authenticator app
-  twofa__totp__text_pairing_info_html: Scan this QR code or enter the plain text key
-    into a TOTP app (e.g. <a href="https://support.google.com/accounts/answer/1066447">Google
-    Authenticator</a>, <a href="https://authy.com/download/">Authy</a>, <a href="https://guide.duo.com/third-party-accounts">Duo
-    Mobile</a>) and enter the code in the field below to activate two-factor authentication.
-  twofa__totp__label_plain_text_key: Plain text key
-  twofa__totp__label_activate: Enable authenticator app
-  twofa_currently_active: 'Currently active: %{twofa_scheme_name}'
-  twofa_not_active: Not activated
-  twofa_label_code: Code
-  twofa_hint_disabled_html: Setting <strong>%{label}</strong> will deactivate and unpair
-    two-factor authentication devices for all users.
-  twofa_hint_required_html: Setting <strong>%{label}</strong> will require all users
-    to set up two-factor authentication at their next login.
-  twofa_label_setup: Enable two-factor authentication
-  twofa_label_deactivation_confirmation: Disable two-factor authentication
-  twofa_notice_select: 'Please select the two-factor scheme you would like to use:'
-  twofa_warning_require: The administrator requires you to enable two-factor authentication.
-  twofa_activated: Two-factor authentication successfully enabled. It is recommended
-    to <a data-method="post" href="%{bc_path}">generate backup codes</a> for your account.
-  twofa_deactivated: Two-factor authentication disabled.
-  twofa_mail_body_security_notification_paired: Two-factor authentication successfully
-    enabled using %{field}.
-  twofa_mail_body_security_notification_unpaired: Two-factor authentication disabled
-    for your account.
-  twofa_mail_body_backup_codes_generated: New two-factor authentication backup codes
-    generated.
-  twofa_mail_body_backup_code_used: A two-factor authentication backup code has been
-    used.
-  twofa_invalid_code: Code is invalid or outdated.
-  twofa_label_enter_otp: Please enter your two-factor authentication code.
-  twofa_too_many_tries: Too many tries.
-  twofa_resend_code: Resend code
-  twofa_code_sent: An authentication code has been sent to you.
-  twofa_generate_backup_codes: Generate backup codes
-  twofa_text_generate_backup_codes_confirmation: This will invalidate all existing backup
-    codes and generate new ones. Would you like to continue?
-  twofa_notice_backup_codes_generated: Your backup codes have been generated.
-  twofa_warning_backup_codes_generated_invalidated: New backup codes have been generated.
-    Your existing codes from %{time} are now invalid.
-  twofa_label_backup_codes: Two-factor authentication backup codes
-  twofa_text_backup_codes_hint: Use these codes instead of a one-time password should
-    you not have access to your second factor. Each code can only be used once. It is
-    recommended to print and store them in a safe place.
-  twofa_text_backup_codes_created_at: Backup codes generated %{datetime}.
-  twofa_backup_codes_already_shown: Backup codes cannot be shown again, please <a data-method="post"
-    href="%{bc_path}">generate new backup codes</a> if required.
-  error_can_not_execute_macro_html: Error executing the <strong>%{name}</strong> macro
-    (%{error})
-  error_macro_does_not_accept_block: This macro does not accept a block of text
-  error_childpages_macro_no_argument: With no argument, this macro can be called from
-    wiki pages only
-  error_circular_inclusion: Circular inclusion detected
-  error_page_not_found: Page not found
-  error_filename_required: Filename required
-  error_invalid_size_parameter: Invalid size parameter
-  error_attachment_not_found: Attachment %{name} not found
-  permission_delete_project: Delete the project
-  field_twofa_scheme: Two-factor authentication scheme
-  text_user_destroy_confirmation: Are you sure you want to delete this user and remove
-    all references to them? This cannot be undone. Often, locking a user instead of
-    deleting them is the better solution. To confirm, please enter their login (%{login})
-    below.
-  text_project_destroy_enter_identifier: To confirm, please enter the project's identifier
-    (%{identifier}) below.
-  button_add_subtask: Add subtask
-  notice_invalid_watcher: 'Invalid watcher: User will not receive any notifications
-    because it does not have access to view this object.'
-  button_fetch_changesets: Fetch commits
-  permission_view_message_watchers: View message watchers list
-  permission_add_message_watchers: Add message watchers
-  permission_delete_message_watchers: Delete message watchers
-  label_message_watchers: Watchers
-  button_copy_link: Copy link
-  error_invalid_authenticity_token: Invalid form authenticity token.
-  error_query_statement_invalid: An error occurred while executing the query and has
-    been logged. Please report this error to your Redmine administrator.

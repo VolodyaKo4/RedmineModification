@@ -1,4 +1,4 @@
-class AddRolesAssignable < ActiveRecord::Migration[4.2]
+class AddRolesAssignable < ActiveRecord::Migration
   def self.up
     add_column :roles, :assignable, :boolean, :default => true
   end

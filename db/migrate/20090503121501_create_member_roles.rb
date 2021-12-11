@@ -1,4 +1,4 @@
-class CreateMemberRoles < ActiveRecord::Migration[4.2]
+class CreateMemberRoles < ActiveRecord::Migration
   def self.up
     create_table :member_roles do |t|
       t.column :member_id, :integer, :null => false

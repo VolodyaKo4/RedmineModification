@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -28,14 +26,14 @@ module Redmine
         if cipher_key.blank? || text.blank?
           text
         else
-          c = OpenSSL::Cipher.new("aes-256-cbc")
+          c = OpenSSL::Cipher::Cipher.new("aes-256-cbc")
           iv = c.random_iv
           c.encrypt
           c.key = cipher_key
           c.iv = iv
           e = c.update(text.to_s)
           e << c.final
-          "aes-256-cbc:" + [e, iv].map {|v| Base64.strict_encode64(v)}.join('--')
+          "aes-256-cbc:" + [e, iv].map {|v| Base64.encode64(v).strip}.join('--')
         end
       end
 
@@ -46,7 +44,7 @@ module Redmine
             return text
           end
           text = match[1]
-          c = OpenSSL::Cipher.new("aes-256-cbc")
+          c = OpenSSL::Cipher::Cipher.new("aes-256-cbc")
           e, iv = text.split("--").map {|s| Base64.decode64(s)}
           c.decrypt
           c.key = cipher_key
@@ -60,9 +58,9 @@ module Redmine
 
       def cipher_key
         key = Redmine::Configuration['database_cipher_key'].to_s
-        key.blank? ? nil : Digest::SHA256.hexdigest(key)[0..31]
+        key.blank? ? nil : Digest::SHA256.hexdigest(key)
       end
-
+      
       def logger
         Rails.logger
       end
@@ -74,7 +72,7 @@ module Redmine
           all.each do |object|
             clear = object.send(attribute)
             object.send "#{attribute}=", clear
-            raise(ActiveRecord::Rollback) unless object.save(validate: false)
+            raise(ActiveRecord::Rollback) unless object.save(:validation => false)
           end
         end ? true : false
       end
@@ -84,10 +82,10 @@ module Redmine
           all.each do |object|
             clear = object.send(attribute)
             object.send :write_attribute, attribute, clear
-            raise(ActiveRecord::Rollback) unless object.save(validate: false)
+            raise(ActiveRecord::Rollback) unless object.save(:validation => false)
           end
-        end ? true : false
-      end
+        end
+      end ? true : false
     end
 
     private

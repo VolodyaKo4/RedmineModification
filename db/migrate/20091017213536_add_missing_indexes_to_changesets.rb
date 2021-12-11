@@ -1,4 +1,4 @@
-class AddMissingIndexesToChangesets < ActiveRecord::Migration[4.2]
+class AddMissingIndexesToChangesets < ActiveRecord::Migration
   def self.up
     add_index :changesets, :user_id
     add_index :changesets, :repository_id

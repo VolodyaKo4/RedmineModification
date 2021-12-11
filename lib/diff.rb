@@ -1,7 +1,6 @@
-# frozen_string_literal: true
-
 module RedmineDiff
   class Diff
+
     VERSION = 0.3
 
     def Diff.lcs(a, b)
@@ -12,14 +11,14 @@ module RedmineDiff
       mvector = []
 
       # First we prune off any common elements at the beginning
-      while (astart <= afinish) && (bstart <= afinish) && (a[astart] == b[bstart])
+      while (astart <= afinish && bstart <= afinish && a[astart] == b[bstart])
         mvector[astart] = bstart
         astart += 1
         bstart += 1
       end
 
       # now the end
-      while (astart <= afinish) && (bstart <= bfinish) && (a[afinish] == b[bfinish])
+      while (astart <= afinish && bstart <= bfinish && a[afinish] == b[bfinish])
         mvector[afinish] = bfinish
         afinish -= 1
         bfinish -= 1
@@ -33,7 +32,7 @@ module RedmineDiff
         aelem = a[aindex]
         next unless bmatches.has_key? aelem
         k = nil
-        bmatches[aelem].reverse_each { |bindex|
+        bmatches[aelem].reverse.each { |bindex|
           if k && (thresh[k] > bindex) && (thresh[k-1] < bindex)
             thresh[k] = bindex
           else
@@ -144,6 +143,7 @@ module RedmineDiff
     def inspect
       @diffs.inspect
     end
+
   end
 end
 
@@ -188,10 +188,10 @@ module Diffable
     end
 
     self[low] = value
-    #  $stderr << "replace #{value} : 0/#{low}/#{init_high} (#{steps} steps) (#{init_high-low} off )\n"
-    #  $stderr.puts self.inspect
-    # gets
-    # p length - low
+    # $stderr << "replace #{value} : 0/#{low}/#{init_high} (#{steps} steps) (#{init_high-low} off )\n"
+    # $stderr.puts self.inspect
+    #gets
+    #p length - low
     return low
   end
 

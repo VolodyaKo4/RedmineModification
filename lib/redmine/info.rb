@@ -1,23 +1,19 @@
-# frozen_string_literal: true
-
 module Redmine
   module Info
     class << self
       def app_name; 'Redmine' end
-      def url; 'https://www.redmine.org/' end
-      def help_url; 'https://www.redmine.org/guide' end
+      def url; 'http://www.redmine.org/' end
+      def help_url; 'http://www.redmine.org/guide' end
       def versioned_name; "#{app_name} #{Redmine::VERSION}" end
 
       def environment
-        s = +"Environment:\n"
+        s = "Environment:\n"
         s << [
           ["Redmine version", Redmine::VERSION],
           ["Ruby version", "#{RUBY_VERSION}-p#{RUBY_PATCHLEVEL} (#{RUBY_RELEASE_DATE}) [#{RUBY_PLATFORM}]"],
           ["Rails version", Rails::VERSION::STRING],
           ["Environment", Rails.env],
-          ["Database adapter", ActiveRecord::Base.connection.adapter_name],
-          ["Mailer queue", ActionMailer::DeliveryJob.queue_adapter.class.name],
-          ["Mailer delivery", ActionMailer::Base.delivery_method]
+          ["Database adapter", ActiveRecord::Base.connection.adapter_name]
         ].map {|info| "  %-30s %s" % info}.join("\n") + "\n"
 
         s << "SCM:\n"

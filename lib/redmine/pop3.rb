@@ -1,7 +1,5 @@
-# frozen_string_literal: false
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -23,20 +21,8 @@ module Redmine
   module POP3
     class << self
       def check(pop_options={}, options={})
-        if pop_options[:ssl]
-          ssl = true
-          if pop_options[:ssl] == 'force'
-            Net::POP3.enable_ssl(OpenSSL::SSL::VERIFY_NONE)
-          else
-            Net::POP3.enable_ssl(OpenSSL::SSL::VERIFY_PEER)
-          end
-        else
-          ssl = false
-        end
-
         host = pop_options[:host] || '127.0.0.1'
-        port = pop_options[:port]
-        port ||= ssl ? '995' : '110'
+        port = pop_options[:port] || '110'
         apop = (pop_options[:apop].to_s == '1')
         delete_unprocessed = (pop_options[:delete_unprocessed].to_s == '1')
 
@@ -50,7 +36,7 @@ module Redmine
             pop_session.each_mail do |msg|
               message = msg.pop
               message_id = (message =~ /^Message-I[dD]: (.*)/ ? $1 : '').strip
-              if MailHandler.safe_receive(message, options)
+              if MailHandler.receive(message, options)
                 msg.delete
                 logger.debug "--> Message #{message_id} processed and deleted from the server" if logger && logger.debug?
               else

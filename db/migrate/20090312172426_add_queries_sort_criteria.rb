@@ -1,4 +1,4 @@
-class AddQueriesSortCriteria < ActiveRecord::Migration[4.2]
+class AddQueriesSortCriteria < ActiveRecord::Migration
   def self.up
     add_column :queries, :sort_criteria, :text
   end

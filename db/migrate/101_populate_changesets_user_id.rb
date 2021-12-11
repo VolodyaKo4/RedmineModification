@@ -1,4 +1,4 @@
-class PopulateChangesetsUserId < ActiveRecord::Migration[4.2]
+class PopulateChangesetsUserId < ActiveRecord::Migration
   def self.up
     committers = Changeset.connection.select_values("SELECT DISTINCT committer FROM #{Changeset.table_name}")
     committers.each do |committer|
@@ -7,7 +7,7 @@ class PopulateChangesetsUserId < ActiveRecord::Migration[4.2]
         username, email = $1.strip, $3
         u = User.find_by_login(username)
         u ||= User.find_by_mail(email) unless email.blank?
-        Changeset.where(["committer = ?", committer]).update_all("user_id = #{u.id}") unless u.nil?
+        Changeset.update_all("user_id = #{u.id}", ["committer = ?", committer]) unless u.nil?
       end
     end
   end

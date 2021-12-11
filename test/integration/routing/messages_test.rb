@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,17 +17,50 @@
 
 require File.expand_path('../../../test_helper', __FILE__)
 
-class RoutingMessagesTest < Redmine::RoutingTest
+class RoutingMessagesTest < ActionController::IntegrationTest
   def test_messages
-    # TODO: refactor routes
-    should_route 'GET /boards/22/topics/new' => 'messages#new', :board_id => '22'
-    should_route 'POST /boards/22/topics/new' => 'messages#new', :board_id => '22'
-    should_route 'POST /boards/22/topics/preview' => 'messages#preview', :board_id => '22'
-
-    should_route 'GET /boards/22/topics/2' => 'messages#show', :id => '2', :board_id => '22'
-    should_route 'GET /boards/22/topics/2/edit' => 'messages#edit', :id => '2', :board_id => '22'
-    should_route 'POST /boards/22/topics/quote/2' => 'messages#quote', :id => '2', :board_id => '22'
-    should_route 'POST /boards/22/topics/2/replies' => 'messages#reply', :id => '2', :board_id => '22'
-    should_route 'POST /boards/22/topics/2/destroy' => 'messages#destroy', :id => '2', :board_id => '22'
+    assert_routing(
+        { :method => 'get', :path => "/boards/22/topics/2" },
+        { :controller => 'messages', :action => 'show', :id => '2',
+          :board_id => '22' }
+      )
+    assert_routing(
+        { :method => 'get', :path => "/boards/lala/topics/new" },
+        { :controller => 'messages', :action => 'new', :board_id => 'lala' }
+      )
+    assert_routing(
+        { :method => 'get', :path => "/boards/lala/topics/22/edit" },
+        { :controller => 'messages', :action => 'edit', :id => '22',
+          :board_id => 'lala' }
+      )
+    assert_routing(
+        { :method => 'post', :path => "/boards/lala/topics/quote/22" },
+        { :controller => 'messages', :action => 'quote', :id => '22',
+          :board_id => 'lala' }
+      )
+    assert_routing(
+        { :method => 'post', :path => "/boards/lala/topics/new" },
+        { :controller => 'messages', :action => 'new', :board_id => 'lala' }
+      )
+    assert_routing(
+        { :method => 'post', :path => "/boards/lala/topics/preview" },
+        { :controller => 'messages', :action => 'preview',
+          :board_id => 'lala' }
+      )
+    assert_routing(
+        { :method => 'post', :path => "/boards/lala/topics/22/edit" },
+        { :controller => 'messages', :action => 'edit', :id => '22',
+          :board_id => 'lala' }
+      )
+    assert_routing(
+        { :method => 'post', :path => "/boards/22/topics/555/replies" },
+        { :controller => 'messages', :action => 'reply', :id => '555',
+          :board_id => '22' }
+      )
+    assert_routing(
+        { :method => 'post', :path => "/boards/22/topics/555/destroy" },
+        { :controller => 'messages', :action => 'destroy', :id => '555',
+          :board_id => '22' }
+      )
   end
 end

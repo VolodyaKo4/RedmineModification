@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,7 +17,7 @@
 
 require File.expand_path('../../../../test_helper', __FILE__)
 
-class HookTest < Redmine::IntegrationTest
+class HookTest < ActionController::IntegrationTest
   fixtures :users, :roles, :projects, :members, :member_roles
 
   # Hooks that are manually registered later
@@ -36,34 +34,15 @@ class HookTest < Redmine::IntegrationTest
     end
   end
 
-  Redmine::Hook.clear_listeners
-
   class ContentForInsideHook < Redmine::Hook::ViewListener
-    render_on :view_welcome_index_left, :inline => <<~VIEW
-      <% content_for :header_tags do %>
-        <%= javascript_include_tag 'test_plugin.js', :plugin => 'test_plugin' %>
-        <%= stylesheet_link_tag 'test_plugin.css', :plugin => 'test_plugin' %>
-      <% end %>
+    render_on :view_welcome_index_left, :inline => <<-VIEW
+<% content_for :header_tags do %>
+  <%= javascript_include_tag 'test_plugin.js', :plugin => 'test_plugin' %>
+  <%= stylesheet_link_tag 'test_plugin.css', :plugin => 'test_plugin' %>
+<% end %>
 
-      <p>ContentForInsideHook content</p>
-    VIEW
-  end
-
-  class SingleRenderOn < Redmine::Hook::ViewListener
-    render_on :view_welcome_index_left, :inline => 'SingleRenderOn 1'
-  end
-
-  class MultipleRenderOn < Redmine::Hook::ViewListener
-    render_on :view_welcome_index_left, {:inline => 'MultipleRenderOn 1'}, {:inline => 'MultipleRenderOn 2'}
-  end
-
-  # Hooks that stores the call context
-  class ContextTestHook < Redmine::Hook::ViewListener
-    cattr_accessor :context
-
-    def controller_account_success_authentication_after(context)
-      self.class.context = context
-    end
+<p>ContentForInsideHook content</p>
+VIEW
   end
 
   def setup
@@ -78,7 +57,8 @@ class HookTest < Redmine::IntegrationTest
     Redmine::Hook.add_listener(ProjectBasedTemplate)
 
     get '/projects/ecookbook'
-    assert_select 'head link[href=?]', '/stylesheets/ecookbook.css'
+    assert_tag :tag => 'link', :attributes => {:href => '/stylesheets/ecookbook.css'},
+                               :parent => {:tag => 'head'}
   end
 
   def test_empty_sidebar_should_be_hidden
@@ -102,25 +82,8 @@ class HookTest < Redmine::IntegrationTest
     assert_response :success
     assert_select 'p', :text => 'ContentForInsideHook content'
     assert_select 'head' do
-      assert_select 'script[src="/plugin_assets/test_plugin/javascripts/test_plugin.js"]'
-      assert_select 'link[href="/plugin_assets/test_plugin/stylesheets/test_plugin.css"]'
+      assert_select 'script[src=/plugin_assets/test_plugin/javascripts/test_plugin.js]'
+      assert_select 'link[href=/plugin_assets/test_plugin/stylesheets/test_plugin.css]'
     end
-  end
-
-  def test_controller_hook_context_should_include_request
-    Redmine::Hook.add_listener(ContextTestHook)
-    post '/login', :params => {:username => 'admin', :password => 'admin'}
-    assert_not_nil ContextTestHook.context
-    context = ContextTestHook.context
-    assert_kind_of ActionDispatch::Request, context[:request]
-    assert_kind_of Hash, context[:request].params
-    assert_kind_of AccountController, context[:hook_caller]
-  end
-
-  def test_multiple_hooks
-    Redmine::Hook.add_listener(SingleRenderOn)
-    Redmine::Hook.add_listener(MultipleRenderOn)
-    get '/'
-    assert_equal 1, response.body.scan("SingleRenderOn 1 MultipleRenderOn 1 MultipleRenderOn 2").size
   end
 end

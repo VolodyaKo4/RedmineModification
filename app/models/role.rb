@@ -1,7 +1,5 @@
-# frozen_string_literal: true
-
 # Redmine - project management software
-# Copyright (C) 2006-2021  Jean-Philippe Lang
+# Copyright (C) 2006-2014  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,8 +16,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class Role < ActiveRecord::Base
-  include Redmine::SafeAttributes
-
   # Custom coder for the permissions attribute that should be an
   # array of symbols. Rails 3 uses Psych which can be *unbelievably*
   # slow on some platforms (eg. mingw32).
@@ -43,81 +39,46 @@ class Role < ActiveRecord::Base
     ['own', :label_issues_visibility_own]
   ]
 
-  TIME_ENTRIES_VISIBILITY_OPTIONS = [
-    ['all', :label_time_entries_visibility_all],
-    ['own', :label_time_entries_visibility_own]
-  ]
-
-  USERS_VISIBILITY_OPTIONS = [
-    ['all', :label_users_visibility_all],
-    ['members_of_visible_projects', :label_users_visibility_members_of_visible_projects]
-  ]
-
-  scope :sorted, lambda {order(:builtin, :position)}
-  scope :givable, lambda {order(:position).where(:builtin => 0)}
-  scope :builtin, (lambda do |*args|
+  scope :sorted, lambda { order("#{table_name}.builtin ASC, #{table_name}.position ASC") }
+  scope :givable, lambda { order("#{table_name}.position ASC").where(:builtin => 0) }
+  scope :builtin, lambda { |*args|
     compare = (args.first == true ? 'not' : '')
     where("#{compare} builtin = 0")
-  end)
+  }
 
   before_destroy :check_deletable
-  has_many :workflow_rules, :dependent => :delete_all
+  has_many :workflow_rules, :dependent => :delete_all do
+    def copy(source_role)
+      WorkflowRule.copy(nil, source_role, nil, proxy_association.owner)
+    end
+  end
   has_and_belongs_to_many :custom_fields, :join_table => "#{table_name_prefix}custom_fields_roles#{table_name_suffix}", :foreign_key => "role_id"
-
-  has_and_belongs_to_many :managed_roles, :class_name => 'Role',
-    :join_table => "#{table_name_prefix}roles_managed_roles#{table_name_suffix}",
-    :association_foreign_key => "managed_role_id"
 
   has_many :member_roles, :dependent => :destroy
   has_many :members, :through => :member_roles
-  acts_as_positioned :scope => :builtin
+  acts_as_list
 
   serialize :permissions, ::Role::PermissionsAttributeCoder
-  store :settings, :accessors => [:permissions_all_trackers, :permissions_tracker_ids]
+  attr_protected :builtin
 
   validates_presence_of :name
   validates_uniqueness_of :name
-  validates_length_of :name, :maximum => 255
-  validates_inclusion_of(
-    :issues_visibility,
+  validates_length_of :name, :maximum => 30
+  validates_inclusion_of :issues_visibility,
     :in => ISSUES_VISIBILITY_OPTIONS.collect(&:first),
-    :if => lambda {|role| role.respond_to?(:issues_visibility) && role.issues_visibility_changed?})
-  validates_inclusion_of(
-    :users_visibility,
-    :in => USERS_VISIBILITY_OPTIONS.collect(&:first),
-    :if => lambda {|role| role.respond_to?(:users_visibility) && role.users_visibility_changed?})
-  validates_inclusion_of(
-    :time_entries_visibility,
-    :in => TIME_ENTRIES_VISIBILITY_OPTIONS.collect(&:first),
-    :if => lambda {|role| role.respond_to?(:time_entries_visibility) && role.time_entries_visibility_changed?})
-
-  safe_attributes(
-    'name',
-    'assignable',
-    'position',
-    'issues_visibility',
-    'users_visibility',
-    'time_entries_visibility',
-    'all_roles_managed',
-    'managed_role_ids',
-    'permissions',
-    'permissions_all_trackers',
-    'permissions_tracker_ids'
-  )
+    :if => lambda {|role| role.respond_to?(:issues_visibility)}
 
   # Copies attributes from another role, arg can be an id or a Role
   def copy_from(arg, options={})
     return unless arg.present?
-
     role = arg.is_a?(Role) ? arg : Role.find_by_id(arg.to_s)
     self.attributes = role.attributes.dup.except("id", "name", "position", "builtin", "permissions")
     self.permissions = role.permissions.dup
-    self.managed_role_ids = role.managed_role_ids.dup
     self
   end
 
   def permissions=(perms)
-    perms = perms.collect {|p| p.to_sym unless p.blank?}.compact.uniq if perms
+    perms = perms.collect {|p| p.to_sym unless p.blank? }.compact.uniq if perms
     write_attribute(:permissions, perms)
   end
 
@@ -134,19 +95,14 @@ class Role < ActiveRecord::Base
 
   def remove_permission!(*perms)
     return unless permissions.is_a?(Array)
-
     permissions_will_change!
-    perms.each {|p| permissions.delete(p.to_sym)}
+    perms.each { |p| permissions.delete(p.to_sym) }
     save!
   end
 
   # Returns true if the role has the given permission
   def has_permission?(perm)
     !permissions.nil? && permissions.include?(perm.to_sym)
-  end
-
-  def consider_workflow?
-    has_permission?(:add_issues) || has_permission?(:edit_issues)
   end
 
   def <=>(role)
@@ -167,10 +123,9 @@ class Role < ActiveRecord::Base
 
   def name
     case builtin
-    when 1 then l(:label_role_non_member, :default => read_attribute(:name))
-    when 2 then l(:label_role_anonymous,  :default => read_attribute(:name))
-    else
-      read_attribute(:name)
+    when 1; l(:label_role_non_member, :default => read_attribute(:name))
+    when 2; l(:label_role_anonymous,  :default => read_attribute(:name))
+    else; read_attribute(:name)
     end
   end
 
@@ -209,70 +164,9 @@ class Role < ActiveRecord::Base
     setable_permissions
   end
 
-  def permissions_tracker_ids(*args)
-    if args.any?
-      Array(permissions_tracker_ids[args.first.to_s]).map(&:to_i)
-    else
-      super || {}
-    end
-  end
-
-  def permissions_tracker_ids=(arg)
-    h = arg.to_hash
-    h.values.each {|v| v.reject!(&:blank?)}
-    super(h)
-  end
-
-  # Returns true if tracker_id belongs to the list of
-  # trackers for which permission is given
-  def permissions_tracker_ids?(permission, tracker_id)
-    permissions_tracker_ids(permission).include?(tracker_id)
-  end
-
-  def permissions_all_trackers
-    super || {}
-  end
-
-  def permissions_all_trackers=(arg)
-    super(arg.to_hash)
-  end
-
-  # Returns true if permission is given for all trackers
-  def permissions_all_trackers?(permission)
-    permissions_all_trackers[permission.to_s].to_s != '0'
-  end
-
-  # Returns true if permission is given for the tracker
-  # (explicitly or for all trackers)
-  def permissions_tracker?(permission, tracker)
-    permissions_all_trackers?(permission) ||
-      permissions_tracker_ids?(permission, tracker.try(:id))
-  end
-
-  # Sets the trackers that are allowed for a permission.
-  # tracker_ids can be an array of tracker ids or :all for
-  # no restrictions.
-  #
-  # Examples:
-  #   role.set_permission_trackers :add_issues, [1, 3]
-  #   role.set_permission_trackers :add_issues, :all
-  def set_permission_trackers(permission, tracker_ids)
-    h = {permission.to_s => (tracker_ids == :all ? '1' : '0')}
-    self.permissions_all_trackers = permissions_all_trackers.merge(h)
-
-    h = {permission.to_s => (tracker_ids == :all ? [] : tracker_ids)}
-    self.permissions_tracker_ids = permissions_tracker_ids.merge(h)
-
-    self
-  end
-
-  def copy_workflow_rules(source_role)
-    WorkflowRule.copy(nil, source_role, nil, self)
-  end
-
   # Find all the roles that can be given to a project member
   def self.find_all_givable
-    Role.givable.to_a
+    Role.givable.all
   end
 
   # Return the builtin 'non member' role.  If the role doesn't exist,
@@ -287,33 +181,29 @@ class Role < ActiveRecord::Base
     find_or_create_system_role(BUILTIN_ANONYMOUS, 'Anonymous')
   end
 
-  private
+private
 
   def allowed_permissions
     @allowed_permissions ||= permissions + Redmine::AccessControl.public_permissions.collect {|p| p.name}
   end
 
   def allowed_actions
-    @actions_allowed ||=
-      allowed_permissions.inject([]) do |actions, permission|
-        actions += Redmine::AccessControl.allowed_actions(permission)
-      end.flatten
+    @actions_allowed ||= allowed_permissions.inject([]) { |actions, permission| actions += Redmine::AccessControl.allowed_actions(permission) }.flatten
   end
 
   def check_deletable
-    raise "Cannot delete role" if members.any?
-    raise "Cannot delete builtin role" if builtin?
+    raise "Can't delete role" if members.any?
+    raise "Can't delete builtin role" if builtin?
   end
 
   def self.find_or_create_system_role(builtin, name)
-    role = unscoped.find_by(:builtin => builtin)
+    role = where(:builtin => builtin).first
     if role.nil?
-      role = unscoped.create(:name => name) do |r|
+      role = create(:name => name, :position => 0) do |r|
         r.builtin = builtin
       end
-      raise "Unable to create the #{name} role (#{role.errors.full_messages.join(',')})." if role.new_record?
+      raise "Unable to create the #{name} role." if role.new_record?
     end
     role
   end
-  private_class_method :find_or_create_system_role
 end

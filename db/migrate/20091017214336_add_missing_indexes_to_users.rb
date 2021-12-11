@@ -1,4 +1,4 @@
-class AddMissingIndexesToUsers < ActiveRecord::Migration[4.2]
+class AddMissingIndexesToUsers < ActiveRecord::Migration
   def self.up
     add_index :users, [:id, :type]
     add_index :users, :auth_source_id
